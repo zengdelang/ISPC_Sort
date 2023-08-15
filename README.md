@@ -53,7 +53,7 @@ CPU: 2th Gen Intel(R) Core(TM) i9-12900K   3.20 GHz
 
 #### Test condition
 
-执行1000000次循环,每次随机生成512个数字用于排序
+Perform 1000,000 loops, each time generating 512 random numbers for sorting.
 
 #### Test code
 
