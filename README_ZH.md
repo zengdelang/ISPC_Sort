@@ -46,8 +46,11 @@ QuickSort16 (AVX512)
 ### 测试环境
 
 OS: Windows 11
+
 Build: UE5 Shipping
+
 CPU: 2th Gen Intel(R) Core(TM) i9-12900K   3.20 GHz
+
 
 ### 双调排序(BitonicSort)
 
