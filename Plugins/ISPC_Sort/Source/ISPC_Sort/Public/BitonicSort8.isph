@@ -1,0 +1,821 @@
+#ifndef __BITONICSORT8_ISPH__
+#define __BITONICSORT8_ISPH__
+
+#define Copy_Temp_Vector8(Temp, V) \
+{ \
+    foreach (i = 0 ... 8) \
+    { \
+        (Temp)[i] = (V)[i]; \
+    } \
+}
+
+#if TARGET_WIDTH == 8
+
+#define Shuffle8_One_Vector(Sort8Type, V, Mask) \
+{\
+    foreach (i = 0 ... 8) \
+    { \
+        (V)[i] = shuffle((V)[i], Mask[i]); \
+    } \
+}
+
+#else
+
+#define Shuffle8_One_Vector(Sort8Type, V, Mask) \
+{\
+    uniform Sort8Type _STemp[8]; \
+    Copy_Temp_Vector8(_STemp, V); \
+    foreach (i = 0 ... 8) \
+    { \
+        _Pragma("ignore warning(perf)") \
+        (V)[i] = _STemp[Mask[i]]; \
+    } \
+}
+
+#endif
+
+#if TARGET_WIDTH == 8
+
+#define Shuffle8_One_Vector_To_Vector(Sort8Type, V, SaveV, Mask) \
+{ \
+    foreach (i = 0 ... 8) \
+    { \
+        (SaveV)[i] = shuffle((V)[i], Mask[i]); \
+    } \
+}
+
+#else
+
+#define Shuffle8_One_Vector_To_Vector(Sort8Type, V, SaveV, Mask) \
+{ \
+    uniform Sort8Type _STemp[8]; \
+    Copy_Temp_Vector8(_STemp, V); \
+    foreach (i = 0 ... 8) \
+    { \
+        _Pragma("ignore warning(perf)") \
+        (SaveV)[i] = _STemp[Mask[i]]; \
+    } \
+}
+
+#endif
+
+#if TARGET_WIDTH == 8 
+
+#define Shuffle8_Two_Vectors(Sort8Type, V1, V2, SaveV, Mask) \
+{ \
+    foreach (i = 0 ... 8) \
+    { \
+        (SaveV)[i] = shuffle((V1)[i], (V2)[i], Mask[i]); \
+    } \
+}
+
+#else
+
+#define Shuffle8_Two_Vectors(Sort8Type, V1, V2, SaveV, Mask) \
+{ \
+    uniform Sort8Type _STemp[8 + 8]; \
+    foreach (i = 0 ... 8) \
+    { \
+        _STemp[i] = (V1)[i]; \
+        _STemp[i + 8] = (V2)[i]; \
+    } \
+\
+    foreach (i = 0 ... 8) \
+    { \
+        _Pragma("ignore warning(perf)") \
+        (SaveV)[i] = _STemp[Mask[i]]; \
+    } \
+}
+
+#endif
+
+#ifndef COEX
+
+#define COEX(V1, V2, COEX_OP, Sort8Type, ...) \
+{ \
+    COEX_OP(V1, V2, Sort8Type, __VA_ARGS__); \
+}
+
+#endif
+
+#define COEX_8_ASC(V1, V2, Sort8Type, ...) \
+{ \
+    foreach (i = 0 ... 8) \
+    { \
+        Sort8Type TempV = (V1)[i]; \
+\
+        (V1)[i] = min(TempV, (V2)[i]); \
+        (V2)[i] = max(TempV, (V2)[i]); \
+    } \
+}
+
+#define COEX_8_DESC(V1, V2, Sort8Type, ...) \
+{ \
+    foreach (i = 0 ... 8) \
+    { \
+        Sort8Type TempV = (V1)[i]; \
+\
+        (V1)[i] = max(TempV, (V2)[i]); \
+        (V2)[i] = min(TempV, (V2)[i]); \
+    } \
+}
+
+#ifndef COEX_SHUFFLE
+
+#define COEX_SHUFFLE(V, Mask1, Mask2, COEX_SHUFFLE_OP, Sort8Type, ...) \
+{ \
+    COEX_SHUFFLE_OP(V, Mask1, Mask2, Sort8Type, __VA_ARGS__); \
+}
+
+#endif
+
+#define COEX_SHUFFLE_8_ASC(V, Mask1, Mask2, Sort8Type, ...) \
+{ \
+    uniform Sort8Type TempV[8]; \
+    Shuffle8_One_Vector_To_Vector(Sort8Type, (V), TempV, Mask1); \
+\
+    uniform Sort8Type Min[8]; \
+    uniform Sort8Type Max[8]; \
+    foreach (i = 0 ... 8) \
+    { \
+        Min[i] = min(TempV[i], (V)[i]); \
+        Max[i] = max(TempV[i], (V)[i]); \
+    } \
+\
+    Shuffle8_Two_Vectors(Sort8Type, Min, Max, (V), Mask2); \
+}
+
+#define COEX_SHUFFLE_8_DESC(V, Mask1, Mask2, Sort8Type, ...) \
+{ \
+    uniform Sort8Type TempV[8]; \
+    Shuffle8_One_Vector_To_Vector(Sort8Type, (V), TempV, Mask1); \
+\
+    uniform Sort8Type Min[8]; \
+    uniform Sort8Type Max[8]; \
+    foreach (i = 0 ... 8) \
+    { \
+        Min[i] = max(TempV[i], (V)[i]); \
+        Max[i] = min(TempV[i], (V)[i]); \
+    } \
+\
+    Shuffle8_Two_Vectors(Sort8Type, Min, Max, (V), Mask2); \
+}
+
+#define Bitonic_Sort_16(Sort8Type, Data, COEX_OP, ...) \
+{ \
+    uniform Sort8Type V1[8]; \
+    uniform Sort8Type V2[8]; \
+    uniform Sort8Type Temp[8]; \
+\
+\
+    { \
+        foreach (i = 0 ... 8) \
+        { \
+            V1[i] = Data[i]; \
+            V2[i] = Data[i + 8]; \
+        } \
+\
+        COEX(V1, V2, COEX_OP, Sort8Type, __VA_ARGS__); \
+    } \
+\
+\
+    { \
+        const uniform int Mask[8] = {1, 0, 3, 2, 5, 4, 7, 6}; \
+        Shuffle8_One_Vector(Sort8Type, V2, Mask); \
+\
+        COEX(V1, V2, COEX_OP, Sort8Type, __VA_ARGS__);  \
+    } \
+\
+\
+    { \
+        Copy_Temp_Vector8(Temp, V1); \
+\
+        const uniform int Mask1[8] = {0, 2, 0 + 8, 2 + 8, 4, 6, 4 + 8, 6 + 8}; \
+        Shuffle8_Two_Vectors(Sort8Type, V1, V2, V1, Mask1); \
+\
+        const uniform int Mask2[8] = {1, 3, 1 + 8, 3 + 8, 5, 7, 5 + 8, 7 + 8}; \
+        Shuffle8_Two_Vectors(Sort8Type, Temp, V2, V2, Mask2); \
+\
+        COEX(V1, V2, COEX_OP, Sort8Type, __VA_ARGS__); \
+    } \
+\
+\
+    { \
+        const uniform int Mask3[8] = {3, 2, 1, 0, 7, 6, 5, 4}; \
+        Shuffle8_One_Vector(Sort8Type, V2, Mask3); \
+\
+        COEX(V1, V2, COEX_OP, Sort8Type, __VA_ARGS__); \
+    } \
+\
+\
+    { \
+        Copy_Temp_Vector8(Temp, V1); \
+\
+        const uniform int Mask1[8] = {0, 1, 0 + 8, 1 + 8,  4, 5,   4 + 8, 5 + 8}; \
+        Shuffle8_Two_Vectors(Sort8Type, V1, V2, V1, Mask1); \
+\
+        const uniform int Mask2[8] = {2, 3, 2 + 8, 3 + 8,  6, 7,   6 + 8, 7 + 8}; \
+        Shuffle8_Two_Vectors(Sort8Type, Temp, V2, V2, Mask2); \
+\
+        COEX(V1, V2, COEX_OP, Sort8Type, __VA_ARGS__); \
+    } \
+\
+\
+    { \
+        Copy_Temp_Vector8(Temp, V1); \
+\
+        const uniform int Mask1[8] = {0, 2, 1 + 8, 3 + 8,  4, 6,  5 + 8,  7 + 8}; \
+        Shuffle8_Two_Vectors(Sort8Type, V1, V2, V1, Mask1); \
+\
+        const uniform int Mask2[8] = {1, 3, 0 + 8, 2 + 8,  5, 7,  4 + 8,  6 +8}; \
+        Shuffle8_Two_Vectors(Sort8Type, Temp, V2, V2, Mask2); \
+\
+        COEX(V1, V2, COEX_OP, Sort8Type, __VA_ARGS__); \
+    } \
+\
+\
+    { \
+        const uniform int Mask[8] = {7, 6, 5, 4, 3, 2, 1, 0}; \
+        Shuffle8_One_Vector(Sort8Type, V2, Mask); \
+\
+        COEX(V1, V2, COEX_OP, Sort8Type, __VA_ARGS__); \
+    } \
+\
+\
+    { \
+        Copy_Temp_Vector8(Temp, V1); \
+\
+        const uniform int Mask1[8] = {0, 2, 1 + 8, 3 + 8, 4,  6, 1 + 4 + 8, 3 + 4 + 8}; \
+        Shuffle8_Two_Vectors(Sort8Type, V1, V2, V1, Mask1); \
+\
+        const uniform int Mask2[8] = {1, 3, 0 + 8, 2 + 8, 1 + 4, 3 + 4, 0 + 4 + 8, 2 + 4 +8}; \
+        Shuffle8_Two_Vectors(Sort8Type, Temp, V2, V2, Mask2); \
+\
+        COEX(V1, V2, COEX_OP, Sort8Type, __VA_ARGS__);  \
+    } \
+\
+\
+    { \
+        Copy_Temp_Vector8(Temp, V1); \
+\
+        const uniform int Mask1[8] = {0, 2, 1 + 8, 3 + 8, 0 + 4, 2 + 4, 1 + 4 + 8, 3 + 4 + 8}; \
+        Shuffle8_Two_Vectors(Sort8Type, V1, V2, V1, Mask1); \
+\
+        const uniform int Mask2[8] = {1, 3, 0 + 8, 2 + 8, 1 + 4, 3 + 4, 0 + 4 + 8, 2 + 4 +8}; \
+        Shuffle8_Two_Vectors(Sort8Type, Temp, V2, V2, Mask2); \
+\
+        COEX(V1, V2, COEX_OP, Sort8Type, __VA_ARGS__); \
+    } \
+\
+\
+    { \
+        Copy_Temp_Vector8(Temp, V1); \
+\
+        const uniform int Mask1[8] = {0,    1,     0 + 8,     1 + 8,       2,    3,      2 + 8,    3 + 8}; \
+\
+        Shuffle8_Two_Vectors(Sort8Type, Temp, V2, V1, Mask1); \
+\
+        const uniform int Mask2[8] = {4,    5,     4 + 8,     5 + 8,       6,    7,      6 + 8,    7 + 8}; \
+\
+        Shuffle8_Two_Vectors(Sort8Type, Temp, V2, V2, Mask2); \
+\
+        COEX(V1, V2, COEX_OP, Sort8Type, __VA_ARGS__); \
+    } \
+\
+\
+    { \
+        const uniform int Mask1[8] = {0, 0 + 8,   2, 2 + 8,    4, 4 + 8,   6, 6 + 8}; \
+        Shuffle8_Two_Vectors(Sort8Type, V1, V2, Data, Mask1); \
+\
+        const uniform int Mask2[8] = {1, 1 + 8,   3, 3 + 8,    5, 5 + 8,   7, 7 + 8}; \
+        Shuffle8_Two_Vectors(Sort8Type, V1, V2, Data + 8, Mask2); \
+    }  \
+}
+
+#ifdef GetVectorIndex8
+#undef GetVectorIndex8
+#endif
+
+#define GetVectorIndex8(Index) (Index) * 8
+ 
+#define Merge_8_Columns_With_16_Elements(Sort8Type, Data, COEX_OP, COEX_SHUFFLE_OP, ...) \
+{\
+    const uniform int Mask[8] = {1, 0, 3, 2, 5, 4, 7, 6}; \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(8), Mask); COEX(Data + GetVectorIndex8(7), Data + GetVectorIndex8(8), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(9), Mask); COEX(Data + GetVectorIndex8(6), Data + GetVectorIndex8(9), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(10), Mask); COEX(Data + GetVectorIndex8(5), Data + GetVectorIndex8(10), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(11), Mask); COEX(Data + GetVectorIndex8(4), Data + GetVectorIndex8(11), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(12), Mask); COEX(Data + GetVectorIndex8(3), Data + GetVectorIndex8(12), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(13), Mask); COEX(Data + GetVectorIndex8(2), Data + GetVectorIndex8(13), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(14), Mask); COEX(Data + GetVectorIndex8(1), Data + GetVectorIndex8(14), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(15), Mask); COEX(Data + GetVectorIndex8(0), Data + GetVectorIndex8(15), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(4), Mask); COEX(Data + GetVectorIndex8(3), Data + GetVectorIndex8(4), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(5), Mask); COEX(Data + GetVectorIndex8(2), Data + GetVectorIndex8(5), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(6), Mask); COEX(Data + GetVectorIndex8(1), Data + GetVectorIndex8(6), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(7), Mask); COEX(Data + GetVectorIndex8(0), Data + GetVectorIndex8(7), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(12), Mask); COEX(Data + GetVectorIndex8(11), Data + GetVectorIndex8(12), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(13), Mask); COEX(Data + GetVectorIndex8(10), Data + GetVectorIndex8(13), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(14), Mask); COEX(Data + GetVectorIndex8(9), Data + GetVectorIndex8(14), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(15), Mask); COEX(Data + GetVectorIndex8(8), Data + GetVectorIndex8(15), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(2), Mask); COEX(Data + GetVectorIndex8(1), Data + GetVectorIndex8(2), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(3), Mask); COEX(Data + GetVectorIndex8(0), Data + GetVectorIndex8(3), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(6), Mask); COEX(Data + GetVectorIndex8(5), Data + GetVectorIndex8(6), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(7), Mask); COEX(Data + GetVectorIndex8(4), Data + GetVectorIndex8(7), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(10), Mask); COEX(Data + GetVectorIndex8(9), Data + GetVectorIndex8(10), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(11), Mask); COEX(Data + GetVectorIndex8(8), Data + GetVectorIndex8(11), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(14), Mask); COEX(Data + GetVectorIndex8(13), Data + GetVectorIndex8(14), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(15), Mask); COEX(Data + GetVectorIndex8(12), Data + GetVectorIndex8(15), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(1), Mask); COEX(Data + GetVectorIndex8(0), Data + GetVectorIndex8(1), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(3), Mask); COEX(Data + GetVectorIndex8(2), Data + GetVectorIndex8(3), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(5), Mask); COEX(Data + GetVectorIndex8(4), Data + GetVectorIndex8(5), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(7), Mask); COEX(Data + GetVectorIndex8(6), Data + GetVectorIndex8(7), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(9), Mask); COEX(Data + GetVectorIndex8(8), Data + GetVectorIndex8(9), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(11), Mask); COEX(Data + GetVectorIndex8(10), Data + GetVectorIndex8(11), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(13), Mask); COEX(Data + GetVectorIndex8(12), Data + GetVectorIndex8(13), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(15), Mask); COEX(Data + GetVectorIndex8(14), Data + GetVectorIndex8(15), COEX_OP, Sort8Type, __VA_ARGS__); \
+\
+    const uniform int Mask1[8] = {0, 1 + 8, 2, 3 + 8, 4, 5 + 8, 6, 7 + 8}; \
+    COEX_SHUFFLE(Data + GetVectorIndex8(0), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(1), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(2), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(3), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(4), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(5), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(6), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(7), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(8), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(9), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(10), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(11), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(12), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(13), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(14), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(15), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    const uniform int Mask2[8] = {3, 2, 1, 0, 7, 6, 5, 4}; \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(8), Mask2); COEX(Data + GetVectorIndex8(7), Data + GetVectorIndex8(8), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(9), Mask2); COEX(Data + GetVectorIndex8(6), Data + GetVectorIndex8(9), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(10), Mask2); COEX(Data + GetVectorIndex8(5), Data + GetVectorIndex8(10), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(11), Mask2); COEX(Data + GetVectorIndex8(4), Data + GetVectorIndex8(11), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(12), Mask2); COEX(Data + GetVectorIndex8(3), Data + GetVectorIndex8(12), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(13), Mask2); COEX(Data + GetVectorIndex8(2), Data + GetVectorIndex8(13), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(14), Mask2); COEX(Data + GetVectorIndex8(1), Data + GetVectorIndex8(14), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(15), Mask2); COEX(Data + GetVectorIndex8(0), Data + GetVectorIndex8(15), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(4), Mask2); COEX(Data + GetVectorIndex8(3), Data + GetVectorIndex8(4), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(5), Mask2); COEX(Data + GetVectorIndex8(2), Data + GetVectorIndex8(5), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(6), Mask2); COEX(Data + GetVectorIndex8(1), Data + GetVectorIndex8(6), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(7), Mask2); COEX(Data + GetVectorIndex8(0), Data + GetVectorIndex8(7), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(12), Mask2); COEX(Data + GetVectorIndex8(11), Data + GetVectorIndex8(12), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(13), Mask2); COEX(Data + GetVectorIndex8(10), Data + GetVectorIndex8(13), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(14), Mask2); COEX(Data + GetVectorIndex8(9), Data + GetVectorIndex8(14), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(15), Mask2); COEX(Data + GetVectorIndex8(8), Data + GetVectorIndex8(15), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(2), Mask2); COEX(Data + GetVectorIndex8(1), Data + GetVectorIndex8(2), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(3), Mask2); COEX(Data + GetVectorIndex8(0), Data + GetVectorIndex8(3), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(6), Mask2); COEX(Data + GetVectorIndex8(5), Data + GetVectorIndex8(6), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(7), Mask2); COEX(Data + GetVectorIndex8(4), Data + GetVectorIndex8(7), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(10), Mask2); COEX(Data + GetVectorIndex8(9), Data + GetVectorIndex8(10), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(11), Mask2); COEX(Data + GetVectorIndex8(8), Data + GetVectorIndex8(11), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(14), Mask2); COEX(Data + GetVectorIndex8(13), Data + GetVectorIndex8(14), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(15), Mask2); COEX(Data + GetVectorIndex8(12), Data + GetVectorIndex8(15), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(1), Mask2); COEX(Data + GetVectorIndex8(0), Data + GetVectorIndex8(1), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(3), Mask2); COEX(Data + GetVectorIndex8(2), Data + GetVectorIndex8(3), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(5), Mask2); COEX(Data + GetVectorIndex8(4), Data + GetVectorIndex8(5), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(7), Mask2); COEX(Data + GetVectorIndex8(6), Data + GetVectorIndex8(7), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(9), Mask2); COEX(Data + GetVectorIndex8(8), Data + GetVectorIndex8(9), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(11), Mask2); COEX(Data + GetVectorIndex8(10), Data + GetVectorIndex8(11), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(13), Mask2); COEX(Data + GetVectorIndex8(12), Data + GetVectorIndex8(13), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(15), Mask2); COEX(Data + GetVectorIndex8(14), Data + GetVectorIndex8(15), COEX_OP, Sort8Type, __VA_ARGS__); \
+\
+    const uniform int Mask3[8] = {0, 1, 2 + 8, 3 + 8, 4, 5, 6 + 8, 7 + 8}; \
+    COEX_SHUFFLE(Data + GetVectorIndex8(0), Mask2, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(0), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(1), Mask2, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(1), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(2), Mask2, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(2), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(3), Mask2, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(3), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(4), Mask2, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(4), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(5), Mask2, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(5), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(6), Mask2, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(6), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(7), Mask2, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(7), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(8), Mask2, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(8), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(9), Mask2, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(9), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(10), Mask2, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(10), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(11), Mask2, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(11), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(12), Mask2, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(12), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(13), Mask2, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(13), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(14), Mask2, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(14), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(15), Mask2, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(15), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    const uniform int Mask4[8] = {7, 6, 5, 4, 3, 2, 1, 0}; \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(8), Mask4); COEX(Data + GetVectorIndex8(7), Data + GetVectorIndex8(8), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(9), Mask4); COEX(Data + GetVectorIndex8(6), Data + GetVectorIndex8(9), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(10), Mask4); COEX(Data + GetVectorIndex8(5), Data + GetVectorIndex8(10), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(11), Mask4); COEX(Data + GetVectorIndex8(4), Data + GetVectorIndex8(11), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(12), Mask4); COEX(Data + GetVectorIndex8(3), Data + GetVectorIndex8(12), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(13), Mask4); COEX(Data + GetVectorIndex8(2), Data + GetVectorIndex8(13), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(14), Mask4); COEX(Data + GetVectorIndex8(1), Data + GetVectorIndex8(14), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(15), Mask4); COEX(Data + GetVectorIndex8(0), Data + GetVectorIndex8(15), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(4), Mask4); COEX(Data + GetVectorIndex8(3), Data + GetVectorIndex8(4), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(5), Mask4); COEX(Data + GetVectorIndex8(2), Data + GetVectorIndex8(5), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(6), Mask4); COEX(Data + GetVectorIndex8(1), Data + GetVectorIndex8(6), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(7), Mask4); COEX(Data + GetVectorIndex8(0), Data + GetVectorIndex8(7), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(12), Mask4); COEX(Data + GetVectorIndex8(11), Data + GetVectorIndex8(12), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(13), Mask4); COEX(Data + GetVectorIndex8(10), Data + GetVectorIndex8(13), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(14), Mask4); COEX(Data + GetVectorIndex8(9), Data + GetVectorIndex8(14), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(15), Mask4); COEX(Data + GetVectorIndex8(8), Data + GetVectorIndex8(15), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(2), Mask4); COEX(Data + GetVectorIndex8(1), Data + GetVectorIndex8(2), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(3), Mask4); COEX(Data + GetVectorIndex8(0), Data + GetVectorIndex8(3), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(6), Mask4); COEX(Data + GetVectorIndex8(5), Data + GetVectorIndex8(6), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(7), Mask4); COEX(Data + GetVectorIndex8(4), Data + GetVectorIndex8(7), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(10), Mask4); COEX(Data + GetVectorIndex8(9), Data + GetVectorIndex8(10), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(11), Mask4); COEX(Data + GetVectorIndex8(8), Data + GetVectorIndex8(11), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(14), Mask4); COEX(Data + GetVectorIndex8(13), Data + GetVectorIndex8(14), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(15), Mask4); COEX(Data + GetVectorIndex8(12), Data + GetVectorIndex8(15), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(1), Mask4); COEX(Data + GetVectorIndex8(0), Data + GetVectorIndex8(1), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(3), Mask4); COEX(Data + GetVectorIndex8(2), Data + GetVectorIndex8(3), COEX_OP, Sort8Type, __VA_ARGS__);\
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(5), Mask4); COEX(Data + GetVectorIndex8(4), Data + GetVectorIndex8(5), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(7), Mask4); COEX(Data + GetVectorIndex8(6), Data + GetVectorIndex8(7), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(9), Mask4); COEX(Data + GetVectorIndex8(8), Data + GetVectorIndex8(9), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(11), Mask4); COEX(Data + GetVectorIndex8(10), Data + GetVectorIndex8(11), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(13), Mask4); COEX(Data + GetVectorIndex8(12), Data + GetVectorIndex8(13), COEX_OP, Sort8Type, __VA_ARGS__); \
+    Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(15), Mask4); COEX(Data + GetVectorIndex8(14), Data + GetVectorIndex8(15), COEX_OP, Sort8Type, __VA_ARGS__); \
+\
+    const uniform int Mask5[8] = {0, 1, 2, 3, 4 + 8, 5 + 8, 6 + 8, 7 + 8}; \
+    const uniform int Mask2_[8] = {2, 3, 0, 1, 6, 7, 4, 5}; \
+    COEX_SHUFFLE(Data + GetVectorIndex8(0), Mask4, Mask5, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(0), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(0), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(1), Mask4, Mask5, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(1), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(1), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(2), Mask4, Mask5, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(2), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(2), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(3), Mask4, Mask5, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(3), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(3), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(4), Mask4, Mask5, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(4), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(4), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(5), Mask4, Mask5, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(5), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(5), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(6), Mask4, Mask5, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(6), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(6), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(7), Mask4, Mask5, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(7), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(7), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(8), Mask4, Mask5, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(8), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__);\
+    COEX_SHUFFLE(Data + GetVectorIndex8(8), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(9), Mask4, Mask5, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(9), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(9), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(10), Mask4, Mask5, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(10), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(10), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(11), Mask4, Mask5, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(11), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(11), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(12), Mask4, Mask5, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(12), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(12), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(13), Mask4, Mask5, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(13), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(13), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(14), Mask4, Mask5, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(14), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(14), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex8(15), Mask4, Mask5, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(15), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex8(15), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+}\
+
+// The size of Data must be 128
+// Green’s irregular sorting network
+#define Sort_16_Column_Wise_8(Sort8Type, Data, COEX_OP, ...) \
+{\
+    COEX(Data + GetVectorIndex8(0), Data + GetVectorIndex8(1), COEX_OP, Sort8Type, __VA_ARGS__); COEX(Data + GetVectorIndex8(2), Data + GetVectorIndex8(3), COEX_OP, Sort8Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex8(4), Data + GetVectorIndex8(5), COEX_OP, Sort8Type, __VA_ARGS__); COEX(Data + GetVectorIndex8(6), Data + GetVectorIndex8(7), COEX_OP, Sort8Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex8(8), Data + GetVectorIndex8(9), COEX_OP, Sort8Type, __VA_ARGS__); COEX(Data + GetVectorIndex8(10), Data + GetVectorIndex8(11), COEX_OP, Sort8Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex8(12), Data + GetVectorIndex8(13), COEX_OP, Sort8Type, __VA_ARGS__); COEX(Data + GetVectorIndex8(14), Data + GetVectorIndex8(15), COEX_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX(Data + GetVectorIndex8(0), Data + GetVectorIndex8(2), COEX_OP, Sort8Type, __VA_ARGS__); COEX(Data + GetVectorIndex8(1), Data + GetVectorIndex8(3), COEX_OP, Sort8Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex8(4), Data + GetVectorIndex8(6), COEX_OP, Sort8Type, __VA_ARGS__); COEX(Data + GetVectorIndex8(5), Data + GetVectorIndex8(7), COEX_OP, Sort8Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex8(8), Data + GetVectorIndex8(10), COEX_OP, Sort8Type, __VA_ARGS__); COEX(Data + GetVectorIndex8(9), Data + GetVectorIndex8(11), COEX_OP, Sort8Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex8(12), Data + GetVectorIndex8(14), COEX_OP, Sort8Type, __VA_ARGS__); COEX(Data + GetVectorIndex8(13), Data + GetVectorIndex8(15), COEX_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX(Data + GetVectorIndex8(0), Data + GetVectorIndex8(4), COEX_OP, Sort8Type, __VA_ARGS__); COEX(Data + GetVectorIndex8(1), Data + GetVectorIndex8(5), COEX_OP, Sort8Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex8(2), Data + GetVectorIndex8(6), COEX_OP, Sort8Type, __VA_ARGS__); COEX(Data + GetVectorIndex8(3), Data + GetVectorIndex8(7), COEX_OP, Sort8Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex8(8), Data + GetVectorIndex8(12), COEX_OP, Sort8Type, __VA_ARGS__); COEX(Data + GetVectorIndex8(9), Data + GetVectorIndex8(13), COEX_OP, Sort8Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex8(10), Data + GetVectorIndex8(14), COEX_OP, Sort8Type, __VA_ARGS__); COEX(Data + GetVectorIndex8(11), Data + GetVectorIndex8(15), COEX_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX(Data + GetVectorIndex8(0), Data + GetVectorIndex8(8), COEX_OP, Sort8Type, __VA_ARGS__); COEX(Data + GetVectorIndex8(1), Data + GetVectorIndex8(9), COEX_OP, Sort8Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex8(2), Data + GetVectorIndex8(10), COEX_OP, Sort8Type, __VA_ARGS__); COEX(Data + GetVectorIndex8(3), Data + GetVectorIndex8(11), COEX_OP, Sort8Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex8(4), Data + GetVectorIndex8(12), COEX_OP, Sort8Type, __VA_ARGS__); COEX(Data + GetVectorIndex8(5), Data + GetVectorIndex8(13), COEX_OP, Sort8Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex8(6), Data + GetVectorIndex8(14), COEX_OP, Sort8Type, __VA_ARGS__); COEX(Data + GetVectorIndex8(7), Data + GetVectorIndex8(15), COEX_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX(Data + GetVectorIndex8(5), Data + GetVectorIndex8(10), COEX_OP, Sort8Type, __VA_ARGS__); COEX(Data + GetVectorIndex8(6), Data + GetVectorIndex8(9), COEX_OP, Sort8Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex8(3), Data + GetVectorIndex8(12), COEX_OP, Sort8Type, __VA_ARGS__); COEX(Data + GetVectorIndex8(7), Data + GetVectorIndex8(11), COEX_OP, Sort8Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex8(13), Data + GetVectorIndex8(14), COEX_OP, Sort8Type, __VA_ARGS__); COEX(Data + GetVectorIndex8(4), Data + GetVectorIndex8(8), COEX_OP, Sort8Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex8(1), Data + GetVectorIndex8(2), COEX_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX(Data + GetVectorIndex8(1), Data + GetVectorIndex8(4), COEX_OP, Sort8Type, __VA_ARGS__); COEX(Data + GetVectorIndex8(7), Data + GetVectorIndex8(13), COEX_OP, Sort8Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex8(2), Data + GetVectorIndex8(8), COEX_OP, Sort8Type, __VA_ARGS__); COEX(Data + GetVectorIndex8(11), Data + GetVectorIndex8(14), COEX_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX(Data + GetVectorIndex8(2), Data + GetVectorIndex8(4), COEX_OP, Sort8Type, __VA_ARGS__); COEX(Data + GetVectorIndex8(5), Data + GetVectorIndex8(6), COEX_OP, Sort8Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex8(9), Data + GetVectorIndex8(10), COEX_OP, Sort8Type, __VA_ARGS__); COEX(Data + GetVectorIndex8(11), Data + GetVectorIndex8(13), COEX_OP, Sort8Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex8(3), Data + GetVectorIndex8(8), COEX_OP, Sort8Type, __VA_ARGS__); COEX(Data + GetVectorIndex8(7), Data + GetVectorIndex8(12), COEX_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX(Data + GetVectorIndex8(3), Data + GetVectorIndex8(5), COEX_OP, Sort8Type, __VA_ARGS__); COEX(Data + GetVectorIndex8(6), Data + GetVectorIndex8(8), COEX_OP, Sort8Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex8(7), Data + GetVectorIndex8(9), COEX_OP, Sort8Type, __VA_ARGS__); COEX(Data + GetVectorIndex8(10), Data + GetVectorIndex8(12), COEX_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX(Data + GetVectorIndex8(3), Data + GetVectorIndex8(4), COEX_OP, Sort8Type, __VA_ARGS__); COEX(Data + GetVectorIndex8(5), Data + GetVectorIndex8(6), COEX_OP, Sort8Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex8(7), Data + GetVectorIndex8(8), COEX_OP, Sort8Type, __VA_ARGS__); COEX(Data + GetVectorIndex8(9), Data + GetVectorIndex8(10), COEX_OP, Sort8Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex8(11), Data + GetVectorIndex8(12), COEX_OP, Sort8Type, __VA_ARGS__); \
+\
+    COEX(Data + GetVectorIndex8(6), Data + GetVectorIndex8(7), COEX_OP, Sort8Type, __VA_ARGS__); COEX(Data + GetVectorIndex8(8), Data + GetVectorIndex8(9), COEX_OP, Sort8Type, __VA_ARGS__); \
+}
+
+#define Bitonic_Merge8_16(Sort8Type, Data, N, S, COEX_OP, COEX_SHUFFLE_OP, ...) \
+{ \
+    for (uniform int T = S * 2; T < 2 * N; T *= 2) \
+	{ \
+		for (uniform int L = 0; L < N; L += T) \
+		{ \
+			for (uniform int J = max(L + T - N, 0); J < T / 2; J += 2) \
+			{ \
+                const uniform int Mask[8] = {7, 6, 5, 4, 3, 2, 1, 0}; \
+                Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(L + T - 1 - J), Mask); \
+                Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(L + T - 2 - J), Mask); \
+\
+				COEX(Data + GetVectorIndex8(L + J), Data + GetVectorIndex8(L + T - 1 - J), COEX_OP, Sort8Type, __VA_ARGS__); \
+				COEX(Data + GetVectorIndex8(L + J + 1), Data + GetVectorIndex8(L + T - 2 - J), COEX_OP, Sort8Type, __VA_ARGS__); \
+			} \
+		} \
+\
+		for (uniform int M = T / 2; M > 4; M /= 2) \
+		{ \
+			for (uniform int k = 0; k < N - M / 2; k += M) \
+			{ \
+				const uniform int Bound = min((k + M / 2), N - (M / 2)); \
+				for (uniform int J = k; J < Bound; J += 2) \
+				{ \
+					COEX(Data + GetVectorIndex8(J), Data + GetVectorIndex8(M / 2 + J), COEX_OP, Sort8Type, __VA_ARGS__); \
+					COEX(Data + GetVectorIndex8(J + 1), Data + GetVectorIndex8(M / 2 + J + 1), COEX_OP, Sort8Type, __VA_ARGS__); \
+				} \
+			} \
+		} \
+\
+		for (uniform int J = 0; J < N - 2; J += 4) \
+		{ \
+			COEX(Data + GetVectorIndex8(J), Data + GetVectorIndex8(J + 2), COEX_OP, Sort8Type, __VA_ARGS__); \
+			COEX(Data + GetVectorIndex8(J + 1), Data + GetVectorIndex8(J + 3), COEX_OP, Sort8Type, __VA_ARGS__); \
+		} \
+\
+		for (uniform int J = 0; J < N; J += 2) \
+		{ \
+			COEX(Data + GetVectorIndex8(J), Data + GetVectorIndex8(J + 1), COEX_OP, Sort8Type, __VA_ARGS__); \
+		} \
+\
+		for (uniform int I = 0; I < N; I += 2) \
+		{ \
+            const uniform int Mask[8] = {4, 5, 6, 7, 0, 1, 2, 3}; \
+            const uniform int Mask1[8] = {0, 1, 2, 3, 4 + 8, 5 + 8, 6 + 8, 7 + 8}; \
+\
+            COEX_SHUFFLE(Data + GetVectorIndex8(I), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+            COEX_SHUFFLE(Data + GetVectorIndex8(I + 1), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+            uniform Sort8Type Temp[8]; \
+            const uniform int Mask2[8] = {0, 0 + 8, 1, 1 + 8,  4, 4 + 8, 5, 5 + 8}; \
+            const uniform int Mask3[8] = {2, 2 + 8, 3, 3 + 8,  6, 6 + 8, 7, 7 + 8}; \
+            Copy_Temp_Vector8(Temp, Data + GetVectorIndex8(I)); \
+            Shuffle8_Two_Vectors(Sort8Type, Data + GetVectorIndex8(I), Data + GetVectorIndex8(I + 1),  Data + GetVectorIndex8(I), Mask2); \
+            Shuffle8_Two_Vectors(Sort8Type, Temp, Data + GetVectorIndex8(I + 1),  Data + GetVectorIndex8(I + 1), Mask3); \
+            COEX(Data + GetVectorIndex8(I), Data + GetVectorIndex8(I + 1), COEX_OP, Sort8Type, __VA_ARGS__); \
+\
+            Copy_Temp_Vector8(Temp, Data + GetVectorIndex8(I)); \
+            Shuffle8_Two_Vectors(Sort8Type, Data + GetVectorIndex8(I), Data + GetVectorIndex8(I + 1),  Data + GetVectorIndex8(I), Mask2); \
+            Shuffle8_Two_Vectors(Sort8Type, Temp, Data + GetVectorIndex8(I + 1),  Data + GetVectorIndex8(I + 1), Mask3); \
+            COEX(Data + GetVectorIndex8(I), Data + GetVectorIndex8(I + 1), COEX_OP, Sort8Type, __VA_ARGS__); \
+\
+            Copy_Temp_Vector8(Temp, Data + GetVectorIndex8(I)); \
+            Shuffle8_Two_Vectors(Sort8Type, Data + GetVectorIndex8(I), Data + GetVectorIndex8(I + 1),  Data + GetVectorIndex8(I), Mask2); \
+            Shuffle8_Two_Vectors(Sort8Type, Temp, Data + GetVectorIndex8(I + 1),  Data + GetVectorIndex8(I + 1), Mask3); \
+		} \
+	} \
+}
+
+#define Bitonic_Merge8_128(Sort8Type, Data, N, S, COEX_OP, COEX_SHUFFLE_OP, ...) \
+{\
+	uniform int Remainder16 = N - N % 16; \
+	uniform int Remainder8 = N - N % 8; \
+\
+	for (uniform int T = S * 2; T < 2 * N; T *= 2) \
+	{ \
+		for (uniform int L = 0; L < N; L += T) \
+		{ \
+			for (uniform int J = max(L + T - N, 0); J < T / 2; J += 2) \
+			{ \
+                const uniform int Mask[8] = {7, 6, 5, 4, 3, 2, 1, 0}; \
+                Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(L + T - 1 - J), Mask); \
+                Shuffle8_One_Vector(Sort8Type, Data + GetVectorIndex8(L + T - 2 - J), Mask); \
+\
+				COEX(Data + GetVectorIndex8(L + J), Data + GetVectorIndex8(L + T - 1 - J), COEX_OP, Sort8Type, __VA_ARGS__); \
+				COEX(Data + GetVectorIndex8(L + J + 1), Data + GetVectorIndex8(L + T - 2 - J), COEX_OP, Sort8Type, __VA_ARGS__); \
+			} \
+		} \
+\
+		for (uniform int M = T / 2; M > 16; M /= 2) \
+		{ \
+			for (uniform int K = 0; K < N - M / 2; K += M) \
+			{ \
+				uniform int Bound = min((K + M / 2), N - (M / 2)); \
+				for (uniform int J = K; J < Bound; J += 2) \
+				{ \
+					COEX(Data + GetVectorIndex8(J), Data + GetVectorIndex8(M / 2 + J), COEX_OP, Sort8Type, __VA_ARGS__); \
+					COEX(Data + GetVectorIndex8(J + 1), Data + GetVectorIndex8(M / 2 + J + 1), COEX_OP, Sort8Type, __VA_ARGS__); \
+				} \
+			} \
+		} \
+\
+		for (uniform int J = 0; J < Remainder16; J += 16) \
+		{ \
+			COEX(Data + GetVectorIndex8(J), Data + GetVectorIndex8(J + 8), COEX_OP, Sort8Type, __VA_ARGS__); \
+			COEX(Data + GetVectorIndex8(J + 1), Data + GetVectorIndex8(J + 9), COEX_OP, Sort8Type, __VA_ARGS__); \
+			COEX(Data + GetVectorIndex8(J + 2), Data + GetVectorIndex8(J + 10), COEX_OP, Sort8Type, __VA_ARGS__); \
+			COEX(Data + GetVectorIndex8(J + 3), Data + GetVectorIndex8(J + 11), COEX_OP, Sort8Type, __VA_ARGS__); \
+			COEX(Data + GetVectorIndex8(J + 4), Data + GetVectorIndex8(J + 12), COEX_OP, Sort8Type, __VA_ARGS__); \
+			COEX(Data + GetVectorIndex8(J + 5), Data + GetVectorIndex8(J + 13), COEX_OP, Sort8Type, __VA_ARGS__); \
+			COEX(Data + GetVectorIndex8(J + 6), Data + GetVectorIndex8(J + 14), COEX_OP, Sort8Type, __VA_ARGS__); \
+			COEX(Data + GetVectorIndex8(J + 7), Data + GetVectorIndex8(J + 15), COEX_OP, Sort8Type, __VA_ARGS__); \
+		} \
+\
+		for (uniform int J = Remainder16 + 8; J < N; J += 1) \
+		{ \
+			COEX(Data + GetVectorIndex8(J - 8), Data + GetVectorIndex8(J), COEX_OP, Sort8Type, __VA_ARGS__); \
+		} \
+\
+		for (uniform int J = 0; J < Remainder8; J += 8) \
+		{ \
+			COEX(Data + GetVectorIndex8(J), Data + GetVectorIndex8(J + 4), COEX_OP, Sort8Type, __VA_ARGS__); \
+			COEX(Data + GetVectorIndex8(J + 1), Data + GetVectorIndex8(J + 5), COEX_OP, Sort8Type, __VA_ARGS__); \
+			COEX(Data + GetVectorIndex8(J + 2), Data + GetVectorIndex8(J + 6), COEX_OP, Sort8Type, __VA_ARGS__); \
+			COEX(Data + GetVectorIndex8(J + 3), Data + GetVectorIndex8(J + 7), COEX_OP, Sort8Type, __VA_ARGS__); \
+		} \
+\
+		for (uniform int J = Remainder8 + 4; J < N; J += 1) \
+		{ \
+			COEX(Data + GetVectorIndex8(J - 4), Data + GetVectorIndex8(J), COEX_OP, Sort8Type, __VA_ARGS__); \
+		} \
+\
+		for (uniform int J = 0; J < N - 2; J += 4) \
+		{ \
+			COEX(Data + GetVectorIndex8(J), Data + GetVectorIndex8(J + 2), COEX_OP, Sort8Type, __VA_ARGS__); \
+			COEX(Data + GetVectorIndex8(J + 1), Data + GetVectorIndex8(J + 3), COEX_OP, Sort8Type, __VA_ARGS__); \
+		} \
+\
+		for (uniform int J = 0; J < N; J += 2) \
+		{ \
+			COEX(Data+ GetVectorIndex8(J), Data + GetVectorIndex8(J + 1), COEX_OP, Sort8Type, __VA_ARGS__); \
+		} \
+\
+        for (uniform int I = 0; I < N; I += 2) \
+        { \
+            const uniform int Mask[8] = {4, 5, 6, 7, 0, 1, 2, 3}; \
+            const uniform int Mask1[8] = {0, 1, 2, 3, 4 + 8, 5 + 8, 6 + 8, 7 + 8}; \
+\
+            COEX_SHUFFLE(Data + GetVectorIndex8(I), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+            COEX_SHUFFLE(Data + GetVectorIndex8(I + 1), Mask, Mask1, COEX_SHUFFLE_OP, Sort8Type, __VA_ARGS__); \
+\
+            uniform Sort8Type Temp[8]; \
+            const uniform int Mask2[8] = {0, 0 + 8, 1, 1 + 8,  4, 4 + 8, 5, 5 + 8}; \
+            const uniform int Mask3[8] = {2, 2 + 8, 3, 3 + 8,  6, 6 + 8, 7, 7 + 8}; \
+            Copy_Temp_Vector8(Temp, Data + GetVectorIndex8(I)); \
+            Shuffle8_Two_Vectors(Sort8Type, Data + GetVectorIndex8(I), Data + GetVectorIndex8(I + 1),  Data + GetVectorIndex8(I), Mask2); \
+            Shuffle8_Two_Vectors(Sort8Type, Temp, Data + GetVectorIndex8(I + 1),  Data + GetVectorIndex8(I + 1), Mask3); \
+            COEX(Data + GetVectorIndex8(I), Data + GetVectorIndex8(I + 1), COEX_OP, Sort8Type, __VA_ARGS__); \
+\
+            Copy_Temp_Vector8(Temp, Data + GetVectorIndex8(I)); \
+            Shuffle8_Two_Vectors(Sort8Type, Data + GetVectorIndex8(I), Data + GetVectorIndex8(I + 1),  Data + GetVectorIndex8(I), Mask2); \
+            Shuffle8_Two_Vectors(Sort8Type, Temp, Data + GetVectorIndex8(I + 1),  Data + GetVectorIndex8(I + 1), Mask3); \
+            COEX(Data + GetVectorIndex8(I), Data + GetVectorIndex8(I + 1), COEX_OP, Sort8Type, __VA_ARGS__); \
+\
+            Copy_Temp_Vector8(Temp, Data + GetVectorIndex8(I)); \
+            Shuffle8_Two_Vectors(Sort8Type, Data + GetVectorIndex8(I), Data + GetVectorIndex8(I + 1),  Data + GetVectorIndex8(I), Mask2); \
+            Shuffle8_Two_Vectors(Sort8Type, Temp, Data + GetVectorIndex8(I + 1),  Data + GetVectorIndex8(I + 1), Mask3); \
+        } \
+	} \
+}
+
+#define Sort8_Sorting_Network_Impl(Sort8Type, Data, DataSize, Buffer, MaxValue, COEX_OP, COEX_SHUFFLE_OP, ...) \
+{ \
+    if (DataSize < 2) \
+    { \
+        return; \
+    } \
+    else if (DataSize == 16) \
+    { \
+        Bitonic_Sort_16(Sort8Type, Data, COEX_OP, __VA_ARGS__); \
+        return; \
+    } \
+\
+    uniform int Remainder = DataSize % 8 ? DataSize % 8 : 8; \
+    uniform int Index_Max_Pad = DataSize - Remainder; \
+\
+    foreach (i = 0 ... DataSize) \
+    { \
+        Buffer[i] = Data[i]; \
+    } \
+\
+    foreach (i = DataSize ... (Index_Max_Pad + 8 + 8)) \
+    { \
+        Buffer[i] = MaxValue; \
+    } \
+\
+    uniform int N = ((Index_Max_Pad % 16 == 0 ? 1 : 0) * 8 + Index_Max_Pad + 8) / 8; \
+\
+    for (uniform int J = 0; J < (N - N % 16); J += 16) \
+    { \
+        uniform Sort8Type* TempData = Buffer + GetVectorIndex8(J); \
+        Sort_16_Column_Wise_8(Sort8Type, TempData, COEX_OP, __VA_ARGS__); \
+        Merge_8_Columns_With_16_Elements(Sort8Type, TempData, COEX_OP, COEX_SHUFFLE_OP, __VA_ARGS__); \
+    } \
+\
+    for (uniform int I = N - N % 16; I < N; I += 2) \
+    { \
+        uniform Sort8Type* TempData = Buffer + GetVectorIndex8(I); \
+        Bitonic_Sort_16(Sort8Type, TempData, COEX_OP, __VA_ARGS__); \
+    } \
+\
+    uniform Sort8Type* TempData = Buffer + GetVectorIndex8(N - N % 16); \
+    Bitonic_Merge8_16(Sort8Type, TempData, (N % 16), 2, COEX_OP, COEX_SHUFFLE_OP, __VA_ARGS__); \
+    Bitonic_Merge8_128(Sort8Type, Buffer, N, 16, COEX_OP, COEX_SHUFFLE_OP, __VA_ARGS__); \
+\
+    foreach (i = 0 ... DataSize) \
+    { \
+        Data[i] = Buffer[i]; \
+    } \
+}
+
+#endif

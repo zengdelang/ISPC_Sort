@@ -1,0 +1,994 @@
+#ifndef __BITONICSORT16_ISPH__
+#define __BITONICSORT16_ISPH__
+
+#define Copy_Temp_Vector16(Temp, V) \
+{ \
+    foreach (i = 0 ... 16) \
+    { \
+        (Temp)[i] = (V)[i]; \
+    } \
+}
+
+#if TARGET_WIDTH == 16
+
+#define Shuffle16_One_Vector(Sort16Type, V, Mask) \
+{\
+    foreach (i = 0 ... 16) \
+    { \
+        (V)[i] = shuffle((V)[i], Mask[i]); \
+    } \
+}
+
+#else
+
+#define Shuffle16_One_Vector(Sort16Type, V, Mask) \
+{\
+    uniform Sort16Type _STemp[16]; \
+    Copy_Temp_Vector16(_STemp, V); \
+    foreach (i = 0 ... 16) \
+    { \
+        _Pragma("ignore warning(perf)") \
+        (V)[i] = _STemp[Mask[i]]; \
+    } \
+}
+
+#endif
+
+#if TARGET_WIDTH == 16
+
+#define Shuffle16_One_Vector_To_Vector(Sort16Type, V, SaveV, Mask) \
+{ \
+    foreach (i = 0 ... 16) \
+    { \
+        (SaveV)[i] = shuffle((V)[i], Mask[i]); \
+    } \
+}
+
+#else
+
+#define Shuffle16_One_Vector_To_Vector(Sort16Type, V, SaveV, Mask) \
+{ \
+    uniform Sort16Type _STemp[16]; \
+    Copy_Temp_Vector16(_STemp, V); \
+    foreach (i = 0 ... 16) \
+    { \
+        _Pragma("ignore warning(perf)") \
+        (SaveV)[i] = _STemp[Mask[i]]; \
+    } \
+}
+
+#endif
+
+#if TARGET_WIDTH == 16 
+
+#define Shuffle16_Two_Vectors(Sort16Type, V1, V2, SaveV, Mask) \
+{ \
+    foreach (i = 0 ... 16) \
+    { \
+        (SaveV)[i] = shuffle((V1)[i], (V2)[i], Mask[i]); \
+    } \
+}
+
+#else
+
+#define Shuffle16_Two_Vectors(Sort16Type, V1, V2, SaveV, Mask) \
+{ \
+    uniform Sort16Type _STemp[16 + 16]; \
+    foreach (i = 0 ... 16) \
+    { \
+        _STemp[i] = (V1)[i]; \
+        _STemp[i + 16] = (V2)[i]; \
+    } \
+\
+    foreach (i = 0 ... 16) \
+    { \
+        _Pragma("ignore warning(perf)") \
+        (SaveV)[i] = _STemp[Mask[i]]; \
+    } \
+}
+
+#endif
+
+#ifndef COEX
+
+#define COEX(V1, V2, COEX_OP, Sort16Type, ...) \
+{ \
+    COEX_OP(V1, V2, Sort16Type, __VA_ARGS__); \
+}
+
+#endif
+
+#define COEX_16_ASC(V1, V2, Sort16Type, ...) \
+{ \
+    foreach (i = 0 ... 16) \
+    { \
+        Sort16Type TempV = (V1)[i]; \
+\
+        (V1)[i] = min(TempV, (V2)[i]); \
+        (V2)[i] = max(TempV, (V2)[i]); \
+    } \
+}
+
+#define COEX_16_DESC(V1, V2, Sort16Type, ...) \
+{ \
+    foreach (i = 0 ... 16) \
+    { \
+        Sort16Type TempV = (V1)[i]; \
+\
+        (V1)[i] = max(TempV, (V2)[i]); \
+        (V2)[i] = min(TempV, (V2)[i]); \
+    } \
+}
+
+#ifndef COEX_SHUFFLE
+
+#define COEX_SHUFFLE(V, Mask1, Mask2, COEX_SHUFFLE_OP, Sort16Type, ...) \
+{ \
+    COEX_SHUFFLE_OP(V, Mask1, Mask2, Sort16Type, __VA_ARGS__); \
+}
+
+#endif
+
+#define COEX_SHUFFLE_16_ASC(V, Mask1, Mask2, Sort16Type, ...) \
+{ \
+    uniform Sort16Type TempV[16]; \
+    Shuffle16_One_Vector_To_Vector(Sort16Type, (V), TempV, Mask1); \
+\
+    uniform Sort16Type Min[16]; \
+    uniform Sort16Type Max[16]; \
+    foreach (i = 0 ... 16) \
+    { \
+        Min[i] = min(TempV[i], (V)[i]); \
+        Max[i] = max(TempV[i], (V)[i]); \
+    } \
+\
+    Shuffle16_Two_Vectors(Sort16Type, Min, Max, (V), Mask2); \
+}
+
+#define COEX_SHUFFLE_16_DESC(V, Mask1, Mask2, Sort16Type, ...) \
+{ \
+    uniform Sort16Type TempV[16]; \
+    Shuffle16_One_Vector_To_Vector(Sort16Type, (V), TempV, Mask1); \
+\
+    uniform Sort16Type Min[16]; \
+    uniform Sort16Type Max[16]; \
+    foreach (i = 0 ... 16) \
+    { \
+        Min[i] = max(TempV[i], (V)[i]); \
+        Max[i] = min(TempV[i], (V)[i]); \
+    } \
+\
+    Shuffle16_Two_Vectors(Sort16Type, Min, Max, (V), Mask2); \
+}
+
+#define Bitonic_Sort_32(Sort16Type, Data, COEX_OP, ...) \
+{ \
+    uniform Sort16Type V1[16]; \
+    uniform Sort16Type V2[16]; \
+    uniform Sort16Type Temp[16]; \
+\
+    { \
+        foreach (i = 0 ... 16) \
+        { \
+            V1[i] = Data[i]; \
+            V2[i] = Data[i + 16]; \
+        } \
+\
+        COEX(V1, V2, COEX_OP, Sort16Type, __VA_ARGS__); \
+    } \
+\
+    { \
+        const uniform int Mask[16] = {1, 0, 3, 2,  5, 4, 7, 6,  9, 8, 11, 10,  13, 12, 15, 14}; \
+        Shuffle16_One_Vector(Sort16Type, V2, Mask); \
+\
+        COEX(V1, V2, COEX_OP, Sort16Type, __VA_ARGS__); \
+    } \
+\
+    { \
+        Copy_Temp_Vector16(Temp, V1); \
+\
+        const uniform int Mask1[16] = {0, 2, 0 + 16, 2 + 16, 4, 6, 4 + 16, 6 + 16,  8, 10, 8 + 16, 10 + 16,  12,  14, 12 + 16, 14 + 16}; \
+        Shuffle16_Two_Vectors(Sort16Type, V1, V2, V1, Mask1); \
+\
+        const uniform int Mask2[16] = {1, 3, 1 + 16, 3 + 16, 5, 7, 5 + 16, 7 + 16, 9, 11, 9 + 16,  11 + 16,  13,  15, 13 + 16, 15 + 16}; \
+        Shuffle16_Two_Vectors(Sort16Type, Temp, V2, V2, Mask2); \
+\
+        COEX(V1, V2, COEX_OP, Sort16Type, __VA_ARGS__); \
+    } \
+\
+    { \
+        const uniform int Mask3[16] = {3, 2, 1, 0,     7, 6, 5, 4,      11, 10, 9, 8,     15, 14, 13, 12}; \
+        Shuffle16_One_Vector(Sort16Type, V2, Mask3); \
+\
+        COEX(V1, V2, COEX_OP, Sort16Type, __VA_ARGS__); \
+    } \
+\
+    { \
+        Copy_Temp_Vector16(Temp, V1); \
+\
+        const uniform int Mask1[16] = {0, 1,   0 + 16, 1 + 16,    4,  5,    4 + 16,  5 + 16,   8, 9, 8 + 16, 9 + 16,      12, 13, 12 + 16, 13 + 16}; \
+        Shuffle16_Two_Vectors(Sort16Type, V1, V2, V1, Mask1); \
+\
+        const uniform int Mask2[16] = {2, 3,   2 + 16, 3 + 16,    6,  7,    6 + 16,  7 + 16,   10, 11, 10 + 16, 11 + 16,   14, 15, 14 + 16, 15 + 16}; \
+        Shuffle16_Two_Vectors(Sort16Type, Temp, V2, V2, Mask2); \
+\
+        COEX(V1, V2, COEX_OP, Sort16Type, __VA_ARGS__); \
+    } \
+\
+    { \
+        Copy_Temp_Vector16(Temp, V1); \
+\
+        const uniform int Mask1[16] = {0, 2,   1 + 16, 3 + 16,    4, 6,  5 + 16, 7 + 16,   8, 10, 9 + 16, 11 + 16,  12, 14, 13 + 16, 15 + 16}; \
+        Shuffle16_Two_Vectors(Sort16Type, V1, V2, V1, Mask1); \
+\
+        const uniform int Mask2[16] = {1, 3,   0 + 16, 2 + 16,    5, 7,  4 + 16, 6 + 16,   9, 11, 8 + 16, 10 + 16,  13, 15, 12 + 16, 14 + 16}; \
+        Shuffle16_Two_Vectors(Sort16Type, Temp, V2, V2, Mask2); \
+\
+        COEX(V1, V2, COEX_OP, Sort16Type, __VA_ARGS__); \
+    } \
+\
+    { \
+        const uniform int Mask3[16] = {7, 6, 5, 4, 3, 2, 1, 0,     15, 14, 13, 12, 11, 10, 9, 8}; \
+        Shuffle16_One_Vector(Sort16Type, V2, Mask3); \
+\
+        COEX(V1, V2, COEX_OP, Sort16Type, __VA_ARGS__); \
+    } \
+\
+    { \
+        Copy_Temp_Vector16(Temp, V1); \
+\
+        const uniform int Mask1[16] = {0, 2, 4, 6,     0 + 16, 2 + 16,   4 + 16,  6 + 16,    8, 10, 12, 14,   8 + 16, 10 + 16, 12 + 16, 14 + 16}; \
+        Shuffle16_Two_Vectors(Sort16Type, V1, V2, V1, Mask1); \
+\
+        const uniform int Mask2[16] = {1, 3, 5, 7,     1 + 16, 3 + 16,   5 + 16,  7 + 16,    9, 11, 13, 15,   9 + 16, 11 + 16, 13 + 16, 15 + 16}; \
+        Shuffle16_Two_Vectors(Sort16Type, Temp, V2, V2, Mask2); \
+\
+        COEX(V1, V2, COEX_OP, Sort16Type, __VA_ARGS__); \
+    } \
+\
+    { \
+        Copy_Temp_Vector16(Temp, V1); \
+\
+        const uniform int Mask1[16] = {0, 2,  0 + 16,  2 + 16,      4, 6,     4 + 16,  6 + 16,      8, 10, 8 + 16, 10 + 16,    12, 14, 12 + 16, 14 + 16}; \
+        Shuffle16_Two_Vectors(Sort16Type, V1, V2, V1, Mask1); \
+\
+        const uniform int Mask2[16] = {1, 3,  1 + 16,  3 + 16,      5, 7,     5 + 16,  7 + 16,      9, 11, 9 + 16, 11 + 16,    13, 15, 13 + 16, 15 + 16}; \
+        Shuffle16_Two_Vectors(Sort16Type, Temp, V2, V2, Mask2); \
+\
+        COEX(V1, V2, COEX_OP, Sort16Type, __VA_ARGS__); \
+    } \
+\
+    { \
+        Copy_Temp_Vector16(Temp, V1); \
+\
+        const uniform int Mask1[16] = {0, 0 + 16,  2, 2 + 16,    4, 4 + 16,    6, 6 + 16,    8, 8 + 16,      10, 10 + 16,         12, 12 + 16,         14, 14 + 16}; \
+        Shuffle16_Two_Vectors(Sort16Type, V1, V2, V1, Mask1); \
+\
+        const uniform int Mask2[16] = {1, 1 + 16,  3, 3 + 16,    5, 5 + 16,    7, 7 + 16,    9, 9 + 16,      11, 11 + 16,         13, 13  + 16,        15, 15 + 16}; \
+        Shuffle16_Two_Vectors(Sort16Type, Temp, V2, V2, Mask2); \
+\
+        COEX(V1, V2, COEX_OP, Sort16Type, __VA_ARGS__); \
+    } \
+\
+    { \
+        const uniform int Mask[16] = {15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0}; \
+        Shuffle16_One_Vector(Sort16Type, V2, Mask); \
+\
+        COEX(V1, V2, COEX_OP, Sort16Type, __VA_ARGS__); \
+    } \
+\
+    { \
+        Copy_Temp_Vector16(Temp, V1); \
+\
+        const uniform int Mask1[16] = {0, 1, 2, 3,    8, 9, 10, 11,     0 + 16,  1 + 16, 2 + 16, 3 + 16,       8 + 16, 9 + 16, 10 + 16, 11 + 16}; \
+        Shuffle16_Two_Vectors(Sort16Type, V1, V2, V1, Mask1); \
+\
+        const uniform int Mask2[16] = {4, 5, 6, 7,    12, 13, 14, 15,   4 + 16, 5 + 16, 6 + 16, 7 + 16,        12 + 16, 13 + 16, 14 + 16, 15 + 16};  \
+        Shuffle16_Two_Vectors(Sort16Type, Temp, V2, V2, Mask2); \
+\
+        COEX(V1, V2, COEX_OP, Sort16Type, __VA_ARGS__); \
+    } \
+\
+    { \
+        Copy_Temp_Vector16(Temp, V1); \
+\
+        const uniform int Mask1[16] = {0, 1, 4, 5,      0 + 16,  1 + 16, 4 + 16, 5 + 16,      8,  9, 12, 13,     8 + 16,  9 + 16, 12 + 16, 13 + 16}; \
+        Shuffle16_Two_Vectors(Sort16Type, V1, V2, V1, Mask1); \
+\
+        const uniform int Mask2[16] = {2, 3, 6, 7,      2 + 16,  3 + 16, 6 + 16, 7 + 16,      10, 11, 14, 15,    10 + 16, 11 + 16, 14 + 16, 15 + 16}; \
+        Shuffle16_Two_Vectors(Sort16Type, Temp, V2, V2, Mask2); \
+\
+        COEX(V1, V2, COEX_OP, Sort16Type, __VA_ARGS__); \
+    } \
+\
+    { \
+        Copy_Temp_Vector16(Temp, V1); \
+\
+        const uniform int Mask1[16] = {0, 2, 0 + 16, 2 + 16,       4, 6, 4 + 16, 6 + 16,     8, 10, 8 + 16, 10 + 16,     12, 14, 12 + 16, 14 + 16}; \
+        Shuffle16_Two_Vectors(Sort16Type, V1, V2, V1, Mask1); \
+\
+        const uniform int Mask2[16] = {1, 3, 1 + 16, 3 + 16,       5, 7, 5 + 16, 7 + 16,     9, 11, 9 + 16, 11 + 16,     13, 15, 13 + 16, 15 + 16}; \
+        Shuffle16_Two_Vectors(Sort16Type, Temp, V2, V2, Mask2); \
+\
+        COEX(V1, V2, COEX_OP, Sort16Type, __VA_ARGS__); \
+    } \
+\
+    { \
+        Copy_Temp_Vector16(Temp, V1); \
+\
+        const uniform int Mask1[16] = {0, 8,     0 + 16, 8 + 16,       2,  10,    2 + 16,  10 + 16,      4, 12,     4 + 16, 12 + 16,     6, 14,    6 + 16,  14 + 16}; \
+\
+        Shuffle16_Two_Vectors(Sort16Type, V1, V2, V1, Mask1); \
+\
+        const uniform int Mask2[16] = {1, 9,     1 + 16, 9 + 16,       3,  11,    3 + 16,  11 + 16,      5, 13,     5 + 16, 13 + 16,     7, 15,    7 + 16,  15 + 16}; \
+\
+        Shuffle16_Two_Vectors(Sort16Type, Temp, V2, V2, Mask2); \
+\
+        COEX(V1, V2, COEX_OP, Sort16Type, __VA_ARGS__); \
+    } \
+\
+\
+    { \
+        const uniform int Mask1[16] = {0, 0 + 16,   2, 2 + 16,    4, 4 + 16,   6, 6 + 16,   8, 8 + 16,   10, 10 + 16,   12, 12 + 16,    14, 14 + 16}; \
+        Shuffle16_Two_Vectors(Sort16Type, V1, V2, Data, Mask1); \
+\
+        const uniform int Mask2[16] = {1, 1 + 16,   3, 3 + 16,    5, 5 + 16,   7, 7 + 16,   9, 9 + 16,   11, 11 + 16,   13, 13 + 16,    15, 15 + 16}; \
+        Shuffle16_Two_Vectors(Sort16Type, V1, V2, Data + 16, Mask2); \
+    } \
+}
+
+#ifdef GetVectorIndex16
+#undef GetVectorIndex16
+#endif
+
+#define GetVectorIndex16(Index) (Index) * 16
+
+#define Merge_16_Columns_With_16_Elements(Sort16Type, Data, COEX_OP, COEX_SHUFFLE_OP, ...) \
+{ \
+    const uniform int Mask[16] = {1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14}; \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(8), Mask); COEX(Data + GetVectorIndex16(7), Data + GetVectorIndex16(8), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(9), Mask); COEX(Data + GetVectorIndex16(6), Data + GetVectorIndex16(9), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(10), Mask); COEX(Data + GetVectorIndex16(5), Data + GetVectorIndex16(10), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(11), Mask); COEX(Data + GetVectorIndex16(4), Data + GetVectorIndex16(11), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(12), Mask); COEX(Data + GetVectorIndex16(3), Data + GetVectorIndex16(12), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(13), Mask); COEX(Data + GetVectorIndex16(2), Data + GetVectorIndex16(13), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(14), Mask); COEX(Data + GetVectorIndex16(1), Data + GetVectorIndex16(14), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(15), Mask); COEX(Data + GetVectorIndex16(0), Data + GetVectorIndex16(15), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(4), Mask); COEX(Data + GetVectorIndex16(3), Data + GetVectorIndex16(4), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(5), Mask); COEX(Data + GetVectorIndex16(2), Data + GetVectorIndex16(5), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(6), Mask); COEX(Data + GetVectorIndex16(1), Data + GetVectorIndex16(6), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(7), Mask); COEX(Data + GetVectorIndex16(0), Data + GetVectorIndex16(7), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(12), Mask); COEX(Data + GetVectorIndex16(11), Data + GetVectorIndex16(12), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(13), Mask); COEX(Data + GetVectorIndex16(10), Data + GetVectorIndex16(13), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(14), Mask); COEX(Data + GetVectorIndex16(9), Data + GetVectorIndex16(14), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(15), Mask); COEX(Data + GetVectorIndex16(8), Data + GetVectorIndex16(15), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(2), Mask); COEX(Data + GetVectorIndex16(1), Data + GetVectorIndex16(2), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(3), Mask); COEX(Data + GetVectorIndex16(0), Data + GetVectorIndex16(3), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(6), Mask); COEX(Data + GetVectorIndex16(5), Data + GetVectorIndex16(6), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(7), Mask); COEX(Data + GetVectorIndex16(4), Data + GetVectorIndex16(7), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(10), Mask); COEX(Data + GetVectorIndex16(9), Data + GetVectorIndex16(10), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(11), Mask); COEX(Data + GetVectorIndex16(8), Data + GetVectorIndex16(11), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(14), Mask); COEX(Data + GetVectorIndex16(13), Data + GetVectorIndex16(14), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(15), Mask); COEX(Data + GetVectorIndex16(12), Data + GetVectorIndex16(15), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(1), Mask); COEX(Data + GetVectorIndex16(0), Data + GetVectorIndex16(1), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(3), Mask); COEX(Data + GetVectorIndex16(2), Data + GetVectorIndex16(3), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(5), Mask); COEX(Data + GetVectorIndex16(4), Data + GetVectorIndex16(5), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(7), Mask); COEX(Data + GetVectorIndex16(6), Data + GetVectorIndex16(7), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(9), Mask); COEX(Data + GetVectorIndex16(8), Data + GetVectorIndex16(9), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(11), Mask); COEX(Data + GetVectorIndex16(10), Data + GetVectorIndex16(11), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(13), Mask); COEX(Data + GetVectorIndex16(12), Data + GetVectorIndex16(13), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(15), Mask); COEX(Data + GetVectorIndex16(14), Data + GetVectorIndex16(15), COEX_OP, Sort16Type, __VA_ARGS__); \
+\
+    const uniform int Mask1[16] = {0, 1 + 16, 2, 3 + 16, 4, 5 + 16, 6, 7 + 16, 8, 9 + 16, 10, 11 + 16, 12, 13 + 16, 14, 15 + 16}; \
+    COEX_SHUFFLE(Data + GetVectorIndex16(0), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(1), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(2), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(3), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(4), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(5), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(6), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(7), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(8), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(9), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(10), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(11), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(12), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(13), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(14), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(15), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    const uniform int Mask2[16] = {3, 2, 1, 0, 7, 6, 5, 4, 11, 10, 9, 8, 15, 14, 13, 12}; \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(8), Mask2); COEX(Data + GetVectorIndex16(7), Data + GetVectorIndex16(8), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(9), Mask2); COEX(Data + GetVectorIndex16(6), Data + GetVectorIndex16(9), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(10), Mask2); COEX(Data + GetVectorIndex16(5), Data + GetVectorIndex16(10), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(11), Mask2); COEX(Data + GetVectorIndex16(4), Data + GetVectorIndex16(11), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(12), Mask2); COEX(Data + GetVectorIndex16(3), Data + GetVectorIndex16(12), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(13), Mask2); COEX(Data + GetVectorIndex16(2), Data + GetVectorIndex16(13), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(14), Mask2); COEX(Data + GetVectorIndex16(1), Data + GetVectorIndex16(14), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(15), Mask2); COEX(Data + GetVectorIndex16(0), Data + GetVectorIndex16(15), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(4), Mask2); COEX(Data + GetVectorIndex16(3), Data + GetVectorIndex16(4), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(5), Mask2); COEX(Data + GetVectorIndex16(2), Data + GetVectorIndex16(5), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(6), Mask2); COEX(Data + GetVectorIndex16(1), Data + GetVectorIndex16(6), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(7), Mask2); COEX(Data + GetVectorIndex16(0), Data + GetVectorIndex16(7), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(12), Mask2); COEX(Data + GetVectorIndex16(11), Data + GetVectorIndex16(12), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(13), Mask2); COEX(Data + GetVectorIndex16(10), Data + GetVectorIndex16(13), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(14), Mask2); COEX(Data + GetVectorIndex16(9), Data + GetVectorIndex16(14), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(15), Mask2); COEX(Data + GetVectorIndex16(8), Data + GetVectorIndex16(15), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(2), Mask2); COEX(Data + GetVectorIndex16(1), Data + GetVectorIndex16(2), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(3), Mask2); COEX(Data + GetVectorIndex16(0), Data + GetVectorIndex16(3), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(6), Mask2); COEX(Data + GetVectorIndex16(5), Data + GetVectorIndex16(6), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(7), Mask2); COEX(Data + GetVectorIndex16(4), Data + GetVectorIndex16(7), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(10), Mask2); COEX(Data + GetVectorIndex16(9), Data + GetVectorIndex16(10), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(11), Mask2); COEX(Data + GetVectorIndex16(8), Data + GetVectorIndex16(11), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(14), Mask2); COEX(Data + GetVectorIndex16(13), Data + GetVectorIndex16(14), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(15), Mask2); COEX(Data + GetVectorIndex16(12), Data + GetVectorIndex16(15), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(1), Mask2); COEX(Data + GetVectorIndex16(0), Data + GetVectorIndex16(1), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(3), Mask2); COEX(Data + GetVectorIndex16(2), Data + GetVectorIndex16(3), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(5), Mask2); COEX(Data + GetVectorIndex16(4), Data + GetVectorIndex16(5), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(7), Mask2); COEX(Data + GetVectorIndex16(6), Data + GetVectorIndex16(7), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(9), Mask2); COEX(Data + GetVectorIndex16(8), Data + GetVectorIndex16(9), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(11), Mask2); COEX(Data + GetVectorIndex16(10), Data + GetVectorIndex16(11), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(13), Mask2); COEX(Data + GetVectorIndex16(12), Data + GetVectorIndex16(13), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(15), Mask2); COEX(Data + GetVectorIndex16(14), Data + GetVectorIndex16(15), COEX_OP, Sort16Type, __VA_ARGS__); \
+\
+    const uniform int Mask3[16] = {0, 1, 2 + 16, 3 + 16, 4, 5, 6 + 16, 7 + 16, 8, 9, 10 + 16, 11 + 16, 12, 13, 14 + 16, 15 + 16}; \
+    COEX_SHUFFLE(Data + GetVectorIndex16(0), Mask2, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(0), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(1), Mask2, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(1), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(2), Mask2, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(2), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(3), Mask2, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(3), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(4), Mask2, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(4), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(5), Mask2, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(5), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(6), Mask2, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(6), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(7), Mask2, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(7), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(8), Mask2, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(8), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(9), Mask2, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(9), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(10), Mask2, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(10), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(11), Mask2, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(11), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(12), Mask2, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(12), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(13), Mask2, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(13), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(14), Mask2, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(14), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(15), Mask2, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(15), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    const uniform int Mask4[16] = {7, 6, 5, 4, 3, 2, 1, 0, 15, 14, 13, 12, 11, 10, 9, 8}; \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(8), Mask4); COEX(Data + GetVectorIndex16(7), Data + GetVectorIndex16(8), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(9), Mask4); COEX(Data + GetVectorIndex16(6), Data + GetVectorIndex16(9), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(10), Mask4); COEX(Data + GetVectorIndex16(5), Data + GetVectorIndex16(10), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(11), Mask4); COEX(Data + GetVectorIndex16(4), Data + GetVectorIndex16(11), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(12), Mask4); COEX(Data + GetVectorIndex16(3), Data + GetVectorIndex16(12), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(13), Mask4); COEX(Data + GetVectorIndex16(2), Data + GetVectorIndex16(13), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(14), Mask4); COEX(Data + GetVectorIndex16(1), Data + GetVectorIndex16(14), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(15), Mask4); COEX(Data + GetVectorIndex16(0), Data + GetVectorIndex16(15), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(4), Mask4); COEX(Data + GetVectorIndex16(3), Data + GetVectorIndex16(4), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(5), Mask4); COEX(Data + GetVectorIndex16(2), Data + GetVectorIndex16(5), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(6), Mask4); COEX(Data + GetVectorIndex16(1), Data + GetVectorIndex16(6), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(7), Mask4); COEX(Data + GetVectorIndex16(0), Data + GetVectorIndex16(7), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(12), Mask4); COEX(Data + GetVectorIndex16(11), Data + GetVectorIndex16(12), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(13), Mask4); COEX(Data + GetVectorIndex16(10), Data + GetVectorIndex16(13), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(14), Mask4); COEX(Data + GetVectorIndex16(9), Data + GetVectorIndex16(14), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(15), Mask4); COEX(Data + GetVectorIndex16(8), Data + GetVectorIndex16(15), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(2), Mask4); COEX(Data + GetVectorIndex16(1), Data + GetVectorIndex16(2), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(3), Mask4); COEX(Data + GetVectorIndex16(0), Data + GetVectorIndex16(3), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(6), Mask4); COEX(Data + GetVectorIndex16(5), Data + GetVectorIndex16(6), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(7), Mask4); COEX(Data + GetVectorIndex16(4), Data + GetVectorIndex16(7), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(10), Mask4); COEX(Data + GetVectorIndex16(9), Data + GetVectorIndex16(10), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(11), Mask4); COEX(Data + GetVectorIndex16(8), Data + GetVectorIndex16(11), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(14), Mask4); COEX(Data + GetVectorIndex16(13), Data + GetVectorIndex16(14), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(15), Mask4); COEX(Data + GetVectorIndex16(12), Data + GetVectorIndex16(15), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(1), Mask4); COEX(Data + GetVectorIndex16(0), Data + GetVectorIndex16(1), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(3), Mask4); COEX(Data + GetVectorIndex16(2), Data + GetVectorIndex16(3), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(5), Mask4); COEX(Data + GetVectorIndex16(4), Data + GetVectorIndex16(5), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(7), Mask4); COEX(Data + GetVectorIndex16(6), Data + GetVectorIndex16(7), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(9), Mask4); COEX(Data + GetVectorIndex16(8), Data + GetVectorIndex16(9), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(11), Mask4); COEX(Data + GetVectorIndex16(10), Data + GetVectorIndex16(11), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(13), Mask4); COEX(Data + GetVectorIndex16(12), Data + GetVectorIndex16(13), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(15), Mask4); COEX(Data + GetVectorIndex16(14), Data + GetVectorIndex16(15), COEX_OP, Sort16Type, __VA_ARGS__); \
+ \
+    const uniform int Mask5[16] = {0, 1, 2, 3, 4 + 16, 5 + 16, 6 + 16, 7 + 16, 8, 9, 10, 11, 12 + 16, 13 + 16, 14 + 16, 15 + 16}; \
+    const uniform int Mask2_[16] = {2, 3, 0, 1, 6, 7, 4, 5, 10, 11, 8, 9, 14, 15, 12, 13}; \
+    COEX_SHUFFLE(Data + GetVectorIndex16(0), Mask4, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(0), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(0), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(1), Mask4, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(1), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(1), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(2), Mask4, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(2), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(2), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(3), Mask4, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(3), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(3), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(4), Mask4, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(4), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(4), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(5), Mask4, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(5), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(5), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(6), Mask4, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(6), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(6), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(7), Mask4, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(7), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(7), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(8), Mask4, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(8), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(8), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(9), Mask4, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(9), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(9), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(10), Mask4, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(10), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(10), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(11), Mask4, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(11), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(11), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(12), Mask4, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(12), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(12), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(13), Mask4, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(13), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(13), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(14), Mask4, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(14), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(14), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(15), Mask4, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(15), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(15), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    const uniform int Mask6[16] = {15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0}; \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(8), Mask6); COEX(Data + GetVectorIndex16(7), Data + GetVectorIndex16(8), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(9), Mask6); COEX(Data + GetVectorIndex16(6), Data + GetVectorIndex16(9), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(10), Mask6); COEX(Data + GetVectorIndex16(5), Data + GetVectorIndex16(10), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(11), Mask6); COEX(Data + GetVectorIndex16(4), Data + GetVectorIndex16(11), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(12), Mask6); COEX(Data + GetVectorIndex16(3), Data + GetVectorIndex16(12), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(13), Mask6); COEX(Data + GetVectorIndex16(2), Data + GetVectorIndex16(13), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(14), Mask6); COEX(Data + GetVectorIndex16(1), Data + GetVectorIndex16(14), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(15), Mask6); COEX(Data + GetVectorIndex16(0), Data + GetVectorIndex16(15), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(4), Mask6); COEX(Data + GetVectorIndex16(3), Data + GetVectorIndex16(4), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(5), Mask6); COEX(Data + GetVectorIndex16(2), Data + GetVectorIndex16(5), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(6), Mask6); COEX(Data + GetVectorIndex16(1), Data + GetVectorIndex16(6), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(7), Mask6); COEX(Data + GetVectorIndex16(0), Data + GetVectorIndex16(7), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(12), Mask6); COEX(Data + GetVectorIndex16(11), Data + GetVectorIndex16(12), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(13), Mask6); COEX(Data + GetVectorIndex16(10), Data + GetVectorIndex16(13), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(14), Mask6); COEX(Data + GetVectorIndex16(9), Data + GetVectorIndex16(14), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(15), Mask6); COEX(Data + GetVectorIndex16(8), Data + GetVectorIndex16(15), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(2), Mask6); COEX(Data + GetVectorIndex16(1), Data + GetVectorIndex16(2), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(3), Mask6); COEX(Data + GetVectorIndex16(0), Data + GetVectorIndex16(3), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(6), Mask6); COEX(Data + GetVectorIndex16(5), Data + GetVectorIndex16(6), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(7), Mask6); COEX(Data + GetVectorIndex16(4), Data + GetVectorIndex16(7), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(10), Mask6); COEX(Data + GetVectorIndex16(9), Data + GetVectorIndex16(10), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(11), Mask6); COEX(Data + GetVectorIndex16(8), Data + GetVectorIndex16(11), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(14), Mask6); COEX(Data + GetVectorIndex16(13), Data + GetVectorIndex16(14), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(15), Mask6); COEX(Data + GetVectorIndex16(12), Data + GetVectorIndex16(15), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(1), Mask6); COEX(Data + GetVectorIndex16(0), Data + GetVectorIndex16(1), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(3), Mask6); COEX(Data + GetVectorIndex16(2), Data + GetVectorIndex16(3), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(5), Mask6); COEX(Data + GetVectorIndex16(4), Data + GetVectorIndex16(5), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(7), Mask6); COEX(Data + GetVectorIndex16(6), Data + GetVectorIndex16(7), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(9), Mask6); COEX(Data + GetVectorIndex16(8), Data + GetVectorIndex16(9), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(11), Mask6); COEX(Data + GetVectorIndex16(10), Data + GetVectorIndex16(11), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(13), Mask6); COEX(Data + GetVectorIndex16(12), Data + GetVectorIndex16(13), COEX_OP, Sort16Type, __VA_ARGS__); \
+    Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(15), Mask6); COEX(Data + GetVectorIndex16(14), Data + GetVectorIndex16(15), COEX_OP, Sort16Type, __VA_ARGS__); \
+\
+    const uniform int Mask7[16] = {0, 1, 2, 3, 4, 5, 6, 7,  8 + 16, 9 + 16, 10 + 16, 11 + 16, 12 + 16, 13 + 16, 14 + 16, 15 + 16}; \
+    const uniform int Mask4_[16] = {4, 5, 6, 7,  0, 1, 2, 3,  12, 13, 14, 15,  8, 9, 10, 11}; \
+    COEX_SHUFFLE(Data + GetVectorIndex16(0), Mask6, Mask7, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(0), Mask4_, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(0), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(0), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(1), Mask6, Mask7, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(1), Mask4_, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(1), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(1), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(2), Mask6, Mask7, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(2), Mask4_, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(2), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(2), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(3), Mask6, Mask7, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(3), Mask4_, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(3), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(3), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(4), Mask6, Mask7, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(4), Mask4_, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(4), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(4), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(5), Mask6, Mask7, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(5), Mask4_, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(5), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(5), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(6), Mask6, Mask7, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(6), Mask4_, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(6), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(6), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(7), Mask6, Mask7, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(7), Mask4_, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(7), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(7), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(8), Mask6, Mask7, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(8), Mask4_, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(8), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(8), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(9), Mask6, Mask7, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(9), Mask4_, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(9), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(9), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(10), Mask6, Mask7, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(10), Mask4_, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(10), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(10), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(11), Mask6, Mask7, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(11), Mask4_, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(11), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(11), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(12), Mask6, Mask7, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(12), Mask4_, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(12), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(12), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(13), Mask6, Mask7, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(13), Mask4_, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(13), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(13), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(14), Mask6, Mask7, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(14), Mask4_, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(14), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(14), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX_SHUFFLE(Data + GetVectorIndex16(15), Mask6, Mask7, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(15), Mask4_, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(15), Mask2_, Mask3, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+    COEX_SHUFFLE(Data + GetVectorIndex16(15), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+}
+
+// The size of Data must be 256
+// Green’s irregular sorting network
+#define Sort_16_Column_Wise_16(Sort16Type, Data, COEX_OP, ...) \
+{ \
+    COEX(Data + GetVectorIndex16(0), Data + GetVectorIndex16(1), COEX_OP, Sort16Type, __VA_ARGS__); COEX(Data + GetVectorIndex16(2), Data + GetVectorIndex16(3), COEX_OP, Sort16Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex16(4), Data + GetVectorIndex16(5), COEX_OP, Sort16Type, __VA_ARGS__); COEX(Data + GetVectorIndex16(6), Data + GetVectorIndex16(7), COEX_OP, Sort16Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex16(8), Data + GetVectorIndex16(9), COEX_OP, Sort16Type, __VA_ARGS__); COEX(Data + GetVectorIndex16(10), Data + GetVectorIndex16(11), COEX_OP, Sort16Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex16(12), Data + GetVectorIndex16(13), COEX_OP, Sort16Type, __VA_ARGS__); COEX(Data + GetVectorIndex16(14), Data + GetVectorIndex16(15), COEX_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX(Data + GetVectorIndex16(0), Data + GetVectorIndex16(2), COEX_OP, Sort16Type, __VA_ARGS__); COEX(Data + GetVectorIndex16(1), Data + GetVectorIndex16(3), COEX_OP, Sort16Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex16(4), Data + GetVectorIndex16(6), COEX_OP, Sort16Type, __VA_ARGS__); COEX(Data + GetVectorIndex16(5), Data + GetVectorIndex16(7), COEX_OP, Sort16Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex16(8), Data + GetVectorIndex16(10), COEX_OP, Sort16Type, __VA_ARGS__); COEX(Data + GetVectorIndex16(9), Data + GetVectorIndex16(11), COEX_OP, Sort16Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex16(12), Data + GetVectorIndex16(14), COEX_OP, Sort16Type, __VA_ARGS__); COEX(Data + GetVectorIndex16(13), Data + GetVectorIndex16(15), COEX_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX(Data + GetVectorIndex16(0), Data + GetVectorIndex16(4), COEX_OP, Sort16Type, __VA_ARGS__); COEX(Data + GetVectorIndex16(1), Data + GetVectorIndex16(5), COEX_OP, Sort16Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex16(2), Data + GetVectorIndex16(6), COEX_OP, Sort16Type, __VA_ARGS__); COEX(Data + GetVectorIndex16(3), Data + GetVectorIndex16(7), COEX_OP, Sort16Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex16(8), Data + GetVectorIndex16(12), COEX_OP, Sort16Type, __VA_ARGS__); COEX(Data + GetVectorIndex16(9), Data + GetVectorIndex16(13), COEX_OP, Sort16Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex16(10), Data + GetVectorIndex16(14), COEX_OP, Sort16Type, __VA_ARGS__); COEX(Data + GetVectorIndex16(11), Data + GetVectorIndex16(15), COEX_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX(Data + GetVectorIndex16(0), Data + GetVectorIndex16(8), COEX_OP, Sort16Type, __VA_ARGS__); COEX(Data + GetVectorIndex16(1), Data + GetVectorIndex16(9), COEX_OP, Sort16Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex16(2), Data + GetVectorIndex16(10), COEX_OP, Sort16Type, __VA_ARGS__); COEX(Data + GetVectorIndex16(3), Data + GetVectorIndex16(11), COEX_OP, Sort16Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex16(4), Data + GetVectorIndex16(12), COEX_OP, Sort16Type, __VA_ARGS__); COEX(Data + GetVectorIndex16(5), Data + GetVectorIndex16(13), COEX_OP, Sort16Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex16(6), Data + GetVectorIndex16(14), COEX_OP, Sort16Type, __VA_ARGS__); COEX(Data + GetVectorIndex16(7), Data + GetVectorIndex16(15), COEX_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX(Data + GetVectorIndex16(5), Data + GetVectorIndex16(10), COEX_OP, Sort16Type, __VA_ARGS__); COEX(Data + GetVectorIndex16(6), Data + GetVectorIndex16(9), COEX_OP, Sort16Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex16(3), Data + GetVectorIndex16(12), COEX_OP, Sort16Type, __VA_ARGS__); COEX(Data + GetVectorIndex16(7), Data + GetVectorIndex16(11), COEX_OP, Sort16Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex16(13), Data + GetVectorIndex16(14), COEX_OP, Sort16Type, __VA_ARGS__); COEX(Data + GetVectorIndex16(4), Data + GetVectorIndex16(8), COEX_OP, Sort16Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex16(1), Data + GetVectorIndex16(2), COEX_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX(Data + GetVectorIndex16(1), Data + GetVectorIndex16(4), COEX_OP, Sort16Type, __VA_ARGS__); COEX(Data + GetVectorIndex16(7), Data + GetVectorIndex16(13), COEX_OP, Sort16Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex16(2), Data + GetVectorIndex16(8), COEX_OP, Sort16Type, __VA_ARGS__); COEX(Data + GetVectorIndex16(11), Data + GetVectorIndex16(14), COEX_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX(Data + GetVectorIndex16(2), Data + GetVectorIndex16(4), COEX_OP, Sort16Type, __VA_ARGS__); COEX(Data + GetVectorIndex16(5), Data + GetVectorIndex16(6), COEX_OP, Sort16Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex16(9), Data + GetVectorIndex16(10), COEX_OP, Sort16Type, __VA_ARGS__); COEX(Data + GetVectorIndex16(11), Data + GetVectorIndex16(13), COEX_OP, Sort16Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex16(3), Data + GetVectorIndex16(8), COEX_OP, Sort16Type, __VA_ARGS__); COEX(Data + GetVectorIndex16(7), Data + GetVectorIndex16(12), COEX_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX(Data + GetVectorIndex16(3), Data + GetVectorIndex16(5), COEX_OP, Sort16Type, __VA_ARGS__); COEX(Data + GetVectorIndex16(6), Data + GetVectorIndex16(8), COEX_OP, Sort16Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex16(7), Data + GetVectorIndex16(9), COEX_OP, Sort16Type, __VA_ARGS__); COEX(Data + GetVectorIndex16(10), Data + GetVectorIndex16(12), COEX_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX(Data + GetVectorIndex16(3), Data + GetVectorIndex16(4), COEX_OP, Sort16Type, __VA_ARGS__); COEX(Data + GetVectorIndex16(5), Data + GetVectorIndex16(6), COEX_OP, Sort16Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex16(7), Data + GetVectorIndex16(8), COEX_OP, Sort16Type, __VA_ARGS__); COEX(Data + GetVectorIndex16(9), Data + GetVectorIndex16(10), COEX_OP, Sort16Type, __VA_ARGS__); \
+    COEX(Data + GetVectorIndex16(11), Data + GetVectorIndex16(12), COEX_OP, Sort16Type, __VA_ARGS__); \
+\
+    COEX(Data + GetVectorIndex16(6), Data + GetVectorIndex16(7), COEX_OP, Sort16Type, __VA_ARGS__); COEX(Data + GetVectorIndex16(8), Data + GetVectorIndex16(9), COEX_OP, Sort16Type, __VA_ARGS__); \
+}
+
+#define Bitonic_Merge16_32(Sort16Type, Data, N, S, COEX_OP, COEX_SHUFFLE_OP, ...) \
+{ \
+    for (uniform int T = S * 2; T < 2 * N; T *= 2) \
+	{ \
+		for (uniform int L = 0; L < N; L += T) \
+		{ \
+			for (uniform int J = max(L + T - N, 0); J < T / 2; J += 2) \
+			{ \
+                const uniform int Mask[16] = {15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0}; \
+                Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(L + T - 1 - J), Mask); \
+                Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(L + T - 2 - J), Mask); \
+\
+				COEX(Data + GetVectorIndex16(L + J), Data + GetVectorIndex16(L + T - 1 - J), COEX_OP, Sort16Type, __VA_ARGS__); \
+				COEX(Data + GetVectorIndex16(L + J + 1), Data + GetVectorIndex16(L + T - 2 - J), COEX_OP, Sort16Type, __VA_ARGS__); \
+			} \
+		} \
+\
+		for (uniform int M = T / 2; M > 4; M /= 2) \
+		{ \
+			for (uniform int k = 0; k < N - M / 2; k += M) \
+			{ \
+				const uniform int Bound = min((k + M / 2), N - (M / 2)); \
+				for (uniform int J = k; J < Bound; J += 2) \
+				{ \
+					COEX(Data + GetVectorIndex16(J), Data + GetVectorIndex16(M / 2 + J), COEX_OP, Sort16Type, __VA_ARGS__); \
+					COEX(Data + GetVectorIndex16(J + 1), Data + GetVectorIndex16(M / 2 + J + 1), COEX_OP, Sort16Type, __VA_ARGS__); \
+				} \
+			} \
+		} \
+\
+		for (uniform int J = 0; J < N - 2; J += 4) \
+		{ \
+			COEX(Data + GetVectorIndex16(J), Data + GetVectorIndex16(J + 2), COEX_OP, Sort16Type, __VA_ARGS__); \
+			COEX(Data + GetVectorIndex16(J + 1), Data + GetVectorIndex16(J + 3), COEX_OP, Sort16Type, __VA_ARGS__); \
+		} \
+\
+		for (uniform int J = 0; J < N; J += 2) \
+		{ \
+			COEX(Data + GetVectorIndex16(J), Data + GetVectorIndex16(J + 1), COEX_OP, Sort16Type, __VA_ARGS__); \
+		} \
+\
+		for (uniform int I = 0; I < N; I += 2) \
+		{ \
+            const uniform int Mask[16] = {8, 9, 10, 11, 12, 13, 14, 15,   0, 1, 2, 3, 4, 5, 6, 7 }; \
+            const uniform int Mask1[16] = {0, 1, 2, 3, 4, 5, 6, 7,  8 + 16, 9 + 16, 10 + 16, 11 + 16,   12 + 16, 13 + 16, 14 + 16, 15 + 16}; \
+\
+            COEX_SHUFFLE(Data + GetVectorIndex16(I), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+            COEX_SHUFFLE(Data + GetVectorIndex16(I + 1), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+            const uniform int Mask4[16] = {4, 5, 6, 7, 0, 1, 2, 3,    12, 13, 14, 15, 8, 9, 10, 11}; \
+            const uniform int Mask5[16] = {0, 1, 2, 3, 4 + 16, 5 + 16, 6 + 16, 7 + 16,  8, 9, 10, 11,   12 + 16, 13 + 16, 14 + 16, 15 + 16}; \
+\
+            COEX_SHUFFLE(Data + GetVectorIndex16(I), Mask4, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+            COEX_SHUFFLE(Data + GetVectorIndex16(I + 1), Mask4, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+            uniform Sort16Type Temp[16]; \
+            const uniform int Mask2[16] = {0, 0 + 16, 1, 1 + 16,  4, 4 + 16, 5, 5 + 16, 8,   8 + 16,  9, 9 + 16,  12, 12 + 16, 13, 13 + 16}; \
+            const uniform int Mask3[16] = {2, 2 + 16, 3, 3 + 16,  6, 6 + 16, 7, 7 + 16, 10, 10 + 16, 11, 11 + 16, 14, 14 + 16, 15, 15 + 16}; \
+            Copy_Temp_Vector16(Temp, Data + GetVectorIndex16(I)); \
+            Shuffle16_Two_Vectors(Sort16Type, Data + GetVectorIndex16(I), Data + GetVectorIndex16(I + 1),  Data + GetVectorIndex16(I), Mask2); \
+            Shuffle16_Two_Vectors(Sort16Type, Temp, Data + GetVectorIndex16(I + 1),  Data + GetVectorIndex16(I + 1), Mask3); \
+            COEX(Data + GetVectorIndex16(I), Data + GetVectorIndex16(I + 1), COEX_OP, Sort16Type, __VA_ARGS__); \
+\
+            Copy_Temp_Vector16(Temp, Data + GetVectorIndex16(I)); \
+            Shuffle16_Two_Vectors(Sort16Type, Data + GetVectorIndex16(I), Data + GetVectorIndex16(I + 1),  Data + GetVectorIndex16(I), Mask2); \
+            Shuffle16_Two_Vectors(Sort16Type, Temp, Data + GetVectorIndex16(I + 1),  Data + GetVectorIndex16(I + 1), Mask3); \
+            COEX(Data + GetVectorIndex16(I), Data + GetVectorIndex16(I + 1), COEX_OP, Sort16Type, __VA_ARGS__); \
+\
+            Copy_Temp_Vector16(Temp, Data + GetVectorIndex16(I)); \
+            Shuffle16_Two_Vectors(Sort16Type, Data + GetVectorIndex16(I), Data + GetVectorIndex16(I + 1),  Data + GetVectorIndex16(I), Mask2); \
+            Shuffle16_Two_Vectors(Sort16Type, Temp, Data + GetVectorIndex16(I + 1),  Data + GetVectorIndex16(I + 1), Mask3); \
+		} \
+	} \
+}
+
+#define Bitonic_Merge16_256(Sort16Type, Data, N, S, COEX_OP, COEX_SHUFFLE_OP, ...) \
+{ \
+	uniform int Remainder16 = N - N % 16; \
+	uniform int Remainder8 = N - N % 8; \
+\
+	for (uniform int T = S * 2; T < 2 * N; T *= 2) \
+	{ \
+		for (uniform int L = 0; L < N; L += T) \
+		{ \
+			for (uniform int J = max(L + T - N, 0); J < T / 2; J += 2) \
+			{ \
+                const uniform int Mask[16] = {15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0}; \
+                Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(L + T - 1 - J), Mask); \
+                Shuffle16_One_Vector(Sort16Type, Data + GetVectorIndex16(L + T - 2 - J), Mask); \
+\
+				COEX(Data + GetVectorIndex16(L + J), Data + GetVectorIndex16(L + T - 1 - J), COEX_OP, Sort16Type, __VA_ARGS__); \
+				COEX(Data + GetVectorIndex16(L + J + 1), Data + GetVectorIndex16(L + T - 2 - J), COEX_OP, Sort16Type, __VA_ARGS__); \
+			} \
+		} \
+\
+		for (uniform int M = T / 2; M > 16; M /= 2) \
+		{ \
+			for (uniform int K = 0; K < N - M / 2; K += M) \
+			{ \
+				uniform int Bound = min((K + M / 2), N - (M / 2)); \
+				for (uniform int J = K; J < Bound; J += 2) \
+				{ \
+					COEX(Data + GetVectorIndex16(J), Data + GetVectorIndex16(M / 2 + J), COEX_OP, Sort16Type, __VA_ARGS__); \
+					COEX(Data + GetVectorIndex16(J + 1), Data + GetVectorIndex16(M / 2 + J + 1), COEX_OP, Sort16Type, __VA_ARGS__); \
+				} \
+			} \
+		} \
+\
+		for (uniform int J = 0; J < Remainder16; J += 16) \
+		{ \
+			COEX(Data + GetVectorIndex16(J), Data + GetVectorIndex16(J + 8), COEX_OP, Sort16Type, __VA_ARGS__); \
+			COEX(Data + GetVectorIndex16(J + 1), Data + GetVectorIndex16(J + 9), COEX_OP, Sort16Type, __VA_ARGS__); \
+			COEX(Data + GetVectorIndex16(J + 2), Data + GetVectorIndex16(J + 10), COEX_OP, Sort16Type, __VA_ARGS__); \
+			COEX(Data + GetVectorIndex16(J + 3), Data + GetVectorIndex16(J + 11), COEX_OP, Sort16Type, __VA_ARGS__); \
+			COEX(Data + GetVectorIndex16(J + 4), Data + GetVectorIndex16(J + 12), COEX_OP, Sort16Type, __VA_ARGS__); \
+			COEX(Data + GetVectorIndex16(J + 5), Data + GetVectorIndex16(J + 13), COEX_OP, Sort16Type, __VA_ARGS__); \
+			COEX(Data + GetVectorIndex16(J + 6), Data + GetVectorIndex16(J + 14), COEX_OP, Sort16Type, __VA_ARGS__); \
+			COEX(Data + GetVectorIndex16(J + 7), Data + GetVectorIndex16(J + 15), COEX_OP, Sort16Type, __VA_ARGS__); \
+		} \
+\
+		for (uniform int J = Remainder16 + 8; J < N; J += 1) \
+		{ \
+			COEX(Data + GetVectorIndex16(J - 8), Data + GetVectorIndex16(J), COEX_OP, Sort16Type, __VA_ARGS__); \
+		} \
+\
+		for (uniform int J = 0; J < Remainder8; J += 8) \
+		{ \
+			COEX(Data + GetVectorIndex16(J), Data + GetVectorIndex16(J + 4), COEX_OP, Sort16Type, __VA_ARGS__); \
+			COEX(Data + GetVectorIndex16(J + 1), Data + GetVectorIndex16(J + 5), COEX_OP, Sort16Type, __VA_ARGS__); \
+			COEX(Data + GetVectorIndex16(J + 2), Data + GetVectorIndex16(J + 6), COEX_OP, Sort16Type, __VA_ARGS__); \
+			COEX(Data + GetVectorIndex16(J + 3), Data + GetVectorIndex16(J + 7), COEX_OP, Sort16Type, __VA_ARGS__); \
+		} \
+\
+		for (uniform int J = Remainder8 + 4; J < N; J += 1) \
+		{ \
+			COEX(Data + GetVectorIndex16(J - 4), Data + GetVectorIndex16(J), COEX_OP, Sort16Type, __VA_ARGS__); \
+		} \
+\
+		for (uniform int J = 0; J < N - 2; J += 4) \
+		{ \
+			COEX(Data + GetVectorIndex16(J), Data + GetVectorIndex16(J + 2), COEX_OP, Sort16Type, __VA_ARGS__); \
+			COEX(Data + GetVectorIndex16(J + 1), Data + GetVectorIndex16(J + 3), COEX_OP, Sort16Type, __VA_ARGS__); \
+		} \
+\
+		for (uniform int J = 0; J < N; J += 2) \
+		{ \
+			COEX(Data+ GetVectorIndex16(J), Data + GetVectorIndex16(J + 1), COEX_OP, Sort16Type, __VA_ARGS__); \
+		} \
+\
+        for (uniform int I = 0; I < N; I += 2) \
+        { \
+            const uniform int Mask[16] = {8, 9, 10, 11, 12, 13, 14, 15,   0, 1, 2, 3, 4, 5, 6, 7 }; \
+            const uniform int Mask1[16] = {0, 1, 2, 3, 4, 5, 6, 7,  8 + 16, 9 + 16, 10 + 16, 11 + 16,   12 + 16, 13 + 16, 14 + 16, 15 + 16}; \
+\
+            COEX_SHUFFLE(Data + GetVectorIndex16(I), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+            COEX_SHUFFLE(Data + GetVectorIndex16(I + 1), Mask, Mask1, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+            const uniform int Mask4[16] = {4, 5, 6, 7, 0, 1, 2, 3,    12, 13, 14, 15, 8, 9, 10, 11}; \
+            const uniform int Mask5[16] = {0, 1, 2, 3, 4 + 16, 5 + 16, 6 + 16, 7 + 16,  8, 9, 10, 11,   12 + 16, 13 + 16, 14 + 16, 15 + 16}; \
+\
+            COEX_SHUFFLE(Data + GetVectorIndex16(I), Mask4, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+            COEX_SHUFFLE(Data + GetVectorIndex16(I + 1), Mask4, Mask5, COEX_SHUFFLE_OP, Sort16Type, __VA_ARGS__); \
+\
+            uniform Sort16Type Temp[16]; \
+            const uniform int Mask2[16] = {0, 0 + 16, 1, 1 + 16,  4, 4 + 16, 5, 5 + 16, 8,   8 + 16,  9, 9 + 16,  12, 12 + 16, 13, 13 + 16}; \
+            const uniform int Mask3[16] = {2, 2 + 16, 3, 3 + 16,  6, 6 + 16, 7, 7 + 16, 10, 10 + 16, 11, 11 + 16, 14, 14 + 16, 15, 15 + 16}; \
+            Copy_Temp_Vector16(Temp, Data + GetVectorIndex16(I)); \
+            Shuffle16_Two_Vectors(Sort16Type, Data + GetVectorIndex16(I), Data + GetVectorIndex16(I + 1),  Data + GetVectorIndex16(I), Mask2); \
+            Shuffle16_Two_Vectors(Sort16Type, Temp, Data + GetVectorIndex16(I + 1),  Data + GetVectorIndex16(I + 1), Mask3); \
+            COEX(Data + GetVectorIndex16(I), Data + GetVectorIndex16(I + 1), COEX_OP, Sort16Type, __VA_ARGS__); \
+\
+            Copy_Temp_Vector16(Temp, Data + GetVectorIndex16(I)); \
+            Shuffle16_Two_Vectors(Sort16Type, Data + GetVectorIndex16(I), Data + GetVectorIndex16(I + 1),  Data + GetVectorIndex16(I), Mask2); \
+            Shuffle16_Two_Vectors(Sort16Type, Temp, Data + GetVectorIndex16(I + 1),  Data + GetVectorIndex16(I + 1), Mask3); \
+            COEX(Data + GetVectorIndex16(I), Data + GetVectorIndex16(I + 1), COEX_OP, Sort16Type, __VA_ARGS__); \
+\
+            Copy_Temp_Vector16(Temp, Data + GetVectorIndex16(I)); \
+            Shuffle16_Two_Vectors(Sort16Type, Data + GetVectorIndex16(I), Data + GetVectorIndex16(I + 1),  Data + GetVectorIndex16(I), Mask2); \
+            Shuffle16_Two_Vectors(Sort16Type, Temp, Data + GetVectorIndex16(I + 1),  Data + GetVectorIndex16(I + 1), Mask3); \
+        } \
+	} \
+}
+
+#define Sort16_Sorting_Network_Impl(Sort16Type, Data, DataSize, Buffer, MaxValue, COEX_OP, COEX_SHUFFLE_OP, ...) \
+{ \
+    if (DataSize < 2) \
+    { \
+        return; \
+    } \
+    else if (DataSize == 32) \
+    { \
+        Bitonic_Sort_32(Sort16Type, Data, COEX_OP, __VA_ARGS__); \
+        return; \
+    } \
+\
+    uniform int Remainder = DataSize % 16 ? DataSize % 16 : 16; \
+    uniform int Index_Max_Pad = DataSize - Remainder; \
+\
+    foreach (i = 0 ... DataSize) \
+    { \
+        Buffer[i] = Data[i]; \
+    } \
+\
+    foreach (i = DataSize ... (Index_Max_Pad + 16 + 16)) \
+    { \
+        Buffer[i] = MaxValue; \
+    } \
+\
+    uniform int N = ((Index_Max_Pad % 32 == 0 ? 1 : 0) * 16 + Index_Max_Pad + 16) / 16; \
+\
+    for (uniform int J = 0; J < (N - N % 16); J += 16) \
+    { \
+       uniform Sort16Type* TempData = Buffer + GetVectorIndex16(J); \
+       Sort_16_Column_Wise_16(Sort16Type, TempData, COEX_OP, __VA_ARGS__); \
+       Merge_16_Columns_With_16_Elements(Sort16Type, TempData, COEX_OP, COEX_SHUFFLE_OP, __VA_ARGS__); \
+    } \
+\
+    for (uniform int I = N - N % 16; I < N; I += 2) \
+    { \
+        uniform Sort16Type* TempData = Buffer + GetVectorIndex16(I); \
+        Bitonic_Sort_32(Sort16Type, TempData, COEX_OP, __VA_ARGS__); \
+    } \
+\
+    uniform Sort16Type* TempData = Buffer + GetVectorIndex16(N - N % 16); \
+    Bitonic_Merge16_32(Sort16Type, TempData, (N % 16), 2, COEX_OP, COEX_SHUFFLE_OP, __VA_ARGS__); \
+    Bitonic_Merge16_256(Sort16Type, Buffer, N, 16, COEX_OP, COEX_SHUFFLE_OP, __VA_ARGS__); \
+\
+    foreach (i = 0 ... DataSize) \
+    { \
+        Data[i] = Buffer[i]; \
+    } \
+}
+
+#endif

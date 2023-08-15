@@ -1,0 +1,118 @@
+#ifndef __XOROSHIRO128PLUS_ISPH__
+#define __XOROSHIRO128PLUS_ISPH__
+
+// https://prng.di.unimi.it/
+// https://prng.di.unimi.it/xoroshiro128plus.c
+
+// inline void rotl(uniform uint64 State[], uniform uint64 Result[], uniform int32 K) 
+#ifndef rotl
+
+#define rotl(State, Result, K, Count)  \
+{  \
+    uniform uint64 Temp3[Count];  \
+    uniform uint64 Temp4[Count];  \
+\
+    foreach(ri = 0 ... Count)  \
+    { \
+       Temp3[ri] = State[ri] << K; \
+    } \
+\
+    foreach(ri = 0 ... Count) \
+    { \
+       Temp4[ri] = State[ri] >> (64 - K); \
+    } \
+\
+    foreach(ri = 0 ... Count) \
+    { \
+       Result[ri] = Temp3[ri] | Temp4[ri]; \
+    } \
+}
+
+#endif
+
+// inline void Xoroshiro128Plus(uniform uint64 State0[], uniform uint64 State1[], uniform uint64 Result[])
+#ifndef Xoroshiro128Plus
+
+#define Xoroshiro128Plus(State0, State1, Result, Count)  \
+{ \
+    foreach(ri = 0 ... Count) \
+    { \
+        Result[ri] = State0[ri] + State1[ri]; \
+    } \
+\
+    foreach(ri = 0 ... Count) \
+    { \
+        State1[ri] ^= State0[ri]; \
+    } \
+\
+    uniform uint64 Temp1[Count]; \
+\
+    rotl(State0, Temp1, 24, Count); \
+\
+    foreach(ri = 0 ... Count) \
+    { \
+        Temp1[ri] ^= State1[ri]; \
+    } \
+\
+    uniform uint64 Temp2[Count]; \
+\
+    foreach(ri = 0 ... Count) \
+    { \
+        Temp2[ri] = State1[ri] << 16; \
+    } \
+\
+    foreach(ri = 0 ... Count) \
+    { \
+        State0[ri] = Temp1[ri] ^ Temp2[ri]; \
+    } \
+\
+    rotl(State1, State1, 37, Count); \
+}
+
+#endif
+
+/** 
+ * average of two integers without overflow
+ * http://aggregate.org/MAGIC/#Average%20of%20Integers 
+ */
+inline uniform int8 Average(uniform int8 A, uniform int8 B) 
+{ 
+    return (A & B) + ((A ^ B) >> 1); 
+}
+
+inline uniform int16 Average(uniform int16 A, uniform int16 B) 
+{ 
+    return (A & B) + ((A ^ B) >> 1); 
+}
+
+inline uniform int32 Average(uniform int32 A, uniform int32 B) 
+{ 
+    return (A & B) + ((A ^ B) >> 1); 
+}
+
+inline uniform int64 Average(uniform int64 A, uniform int64 B) 
+{ 
+    return (A & B) + ((A ^ B) >> 1); 
+}
+
+inline uniform uint8 Average(uniform uint8 A, uniform uint8 B) 
+{ 
+    return (A & B) + ((A ^ B) >> 1); 
+}
+
+inline uniform uint16 Average(uniform uint16 A, uniform uint16 B) 
+{ 
+    return (A & B) + ((A ^ B) >> 1); 
+}
+
+inline uniform uint32 Average(uniform uint32 A, uniform uint32 B) 
+{ 
+    return (A & B) + ((A ^ B) >> 1); 
+}
+
+inline uniform uint64 Average(uniform uint64 A, uniform uint64 B) 
+{ 
+    return (A & B) + ((A ^ B) >> 1); 
+}
+
+#endif
