@@ -497,26 +497,9 @@ inline uniform int Partition_Vec(uniform Sort8Type CurVec[], uniform Sort8Type P
 
     /* which elements are larger than the pivot */
     // __m256i compared = _mm256_cmpgt_epi32(Curr_Vec, pivot_vec);
-    uniform uint32 Compared[8];
-    foreach (i = 0 ... 8)
-    {
-        Compared[i] = sign_extend(CurVec[i] > PivotVec[i]);
-    }
-
     /* extract the most significant bit from each integer of the vector */
     // int mm = _mm256_movemask_ps(_mm256_castsi256_ps(compared));
-    uniform uint32 ComparedMask[8] = {0b1, 0b10, 0b100, 0b1000, 0b10000, 0b100000, 0b1000000, 0b10000000};
-    foreach (i = 0 ... 8)
-    {
-        Compared[i] = Compared[i] & ComparedMask[i];
-    }
-
-    int32 Sum = 0;
-    foreach (i = 0 ... 8)
-    {
-        Sum += Compared[i];
-    }
-    uniform int32 MoveMask = reduce_add(Sum);
+    uniform int32 MoveMask = packmask(CurVec[programIndex] > PivotVec[programIndex]);
 
     /* how many ones, each 1 stands for an element greater than pivot */
     // int Amount_GT_Pivot = _mm_popcnt_u32((mm));
@@ -798,26 +781,9 @@ inline uniform Sort8Type Partition_Vectorized_64(uniform Sort8Type Data[], unifo
 
         /* which elements are larger than the pivot */
         // __m256i compared = _mm256_cmpgt_epi32(Curr_Vec, pivot_vec);
-        uniform uint32 Compared[8];
-        foreach (j = 0 ... 8)
-        {
-            Compared[j] = sign_extend(CurVec[j] > PivotVec[j]);
-        }
-
         /* extract the most significant bit from each integer of the vector */
         // int mm = _mm256_movemask_ps(_mm256_castsi256_ps(compared));
-        uniform uint32 ComparedMask[8] = {0b1, 0b10, 0b100, 0b1000, 0b10000, 0b100000, 0b1000000, 0b10000000};
-        foreach (j = 0 ... 8)
-        {
-            Compared[j] = Compared[j] & ComparedMask[j];
-        }
-
-        int32 Sum = 0;
-        foreach (j = 0 ... 8)
-        {
-            Sum += Compared[j];
-        }
-        uniform int32 MoveMask = reduce_add(Sum);
+        uniform int32 MoveMask = packmask(CurVec[programIndex] > PivotVec[programIndex]);
 
         /* how many ones, each 1 stands for an element greater than pivot */
         // int Amount_GT_Pivot = _mm_popcnt_u32((mm));
@@ -828,6 +794,7 @@ inline uniform Sort8Type Partition_Vectorized_64(uniform Sort8Type Data[], unifo
 
         /* this is a slower way to partition an array with vector instructions */
         //__m256i blend_mask = _mm256_cmpgt_epi32(permuted, pivot_vec);
+        uniform uint32 Compared[8];
         foreach (j = 0 ... 8)
         {
             Compared[j] = sign_extend(CurVec[j] > PivotVec[j]);
@@ -843,7 +810,7 @@ inline uniform Sort8Type Partition_Vectorized_64(uniform Sort8Type Data[], unifo
             Vec_L_New[j] = select((bool)Compared[j], Vec_Right[j], CurVec[j]);
         }
 
-        //__m256i vec_R_new = _mm256_blendv_epi8(vec_R, permuted, blend_mask);   选择Pivot前R, Pivot后L的
+        //__m256i vec_R_new = _mm256_blendv_epi8(vec_R, permuted, blend_mask);
         uniform Sort8Type Vec_R_New[8];
         foreach (j = 0 ... 8)
         {
