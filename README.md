@@ -183,7 +183,7 @@ UE5 TArray::Sort:             43.558048 s
 
 fast-and-robust AVX::Sort:    3.214110 s
 
-ISPC::Sort:                   3.307544 s
+ISPC::Sort:                   2.981163 s
 
 ## References
 
