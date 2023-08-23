@@ -484,6 +484,14 @@ const uniform int32 Permutation_Masks[256][8] = {{0, 1, 2, 3, 4, 5, 6, 7},
 
 inline uniform int Partition_Vec(uniform Sort8Type CurVec[], uniform Sort8Type PivotVec[], uniform Sort8Type SmallestVec[], uniform Sort8Type BiggestVec[])
 {
+    /* which elements are larger than the pivot */
+    // __m256i compared = _mm256_cmpgt_epi32(Curr_Vec, pivot_vec);
+    /* extract the most significant bit from each integer of the vector */
+    // int mm = _mm256_movemask_ps(_mm256_castsi256_ps(compared));
+    uniform int32 MoveMask = packmask(CurVec[programIndex] > PivotVec[programIndex]);
+
+    prefetch_l1(&Permutation_Masks[0]);
+
     /* update the smallest and largest values of the array */
     foreach (i = 0 ... 8)
     {
@@ -494,12 +502,6 @@ inline uniform int Partition_Vec(uniform Sort8Type CurVec[], uniform Sort8Type P
     {
         BiggestVec[i] = max(BiggestVec[i], CurVec[i]);
     }
-
-    /* which elements are larger than the pivot */
-    // __m256i compared = _mm256_cmpgt_epi32(Curr_Vec, pivot_vec);
-    /* extract the most significant bit from each integer of the vector */
-    // int mm = _mm256_movemask_ps(_mm256_castsi256_ps(compared));
-    uniform int32 MoveMask = packmask(CurVec[programIndex] > PivotVec[programIndex]);
 
     /* how many ones, each 1 stands for an element greater than pivot */
     // int Amount_GT_Pivot = _mm_popcnt_u32((mm));
@@ -768,6 +770,14 @@ inline uniform Sort8Type Partition_Vectorized_64(uniform Sort8Type Data[], unifo
         uniform Sort8Type CurVec[8];
         Load_Vector_8(Data + Left, CurVec);
 
+        /* which elements are larger than the pivot */
+        // __m256i compared = _mm256_cmpgt_epi32(Curr_Vec, pivot_vec);
+        /* extract the most significant bit from each integer of the vector */
+        // int mm = _mm256_movemask_ps(_mm256_castsi256_ps(compared));
+        uniform int32 MoveMask = packmask(CurVec[programIndex] > PivotVec[programIndex]);
+
+        prefetch_l1(&Permutation_Masks[0]);
+
         /* update the smallest and largest values of the array */
         foreach (j = 0 ... 8)
         {
@@ -778,12 +788,6 @@ inline uniform Sort8Type Partition_Vectorized_64(uniform Sort8Type Data[], unifo
         {
             BiggestVec[j] = max(BiggestVec[j], CurVec[j]);
         }
-
-        /* which elements are larger than the pivot */
-        // __m256i compared = _mm256_cmpgt_epi32(Curr_Vec, pivot_vec);
-        /* extract the most significant bit from each integer of the vector */
-        // int mm = _mm256_movemask_ps(_mm256_castsi256_ps(compared));
-        uniform int32 MoveMask = packmask(CurVec[programIndex] > PivotVec[programIndex]);
 
         /* how many ones, each 1 stands for an element greater than pivot */
         // int Amount_GT_Pivot = _mm_popcnt_u32((mm));
