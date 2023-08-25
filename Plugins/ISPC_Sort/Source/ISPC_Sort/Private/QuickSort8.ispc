@@ -997,7 +997,7 @@ export void QuickSort8(uniform Sort8Type Data[], uniform int32 Left, uniform int
     if (Right - Left < 513)
     {
         /* use sorting networks for small arrays */
-        uniform int Buffer[520]; /* buffer for sorting networks */
+        uniform Sort8Type Buffer[520]; /* buffer for sorting networks */
         uniform Sort8Type* DataLeft = Data + Left;
         uniform int DataSize = Right - Left + 1;
         Sort8_Sorting_Network_Impl(Sort8Type, DataLeft, DataSize, Buffer, 2147483647, COEX_8_ASC, COEX_SHUFFLE_8_ASC);
