@@ -3,9 +3,9 @@
 
 #define Copy_Temp_Vector8(Temp, V) \
 { \
-    foreach (i = 0 ... 8) \
+    foreach (si = 0 ... 8) \
     { \
-        (Temp)[i] = (V)[i]; \
+        (Temp)[si] = (V)[si]; \
     } \
 }
 
@@ -13,9 +13,9 @@
 
 #define Shuffle8_One_Vector(Sort8Type, V, Mask) \
 {\
-    foreach (i = 0 ... 8) \
+    foreach (si = 0 ... 8) \
     { \
-        (V)[i] = shuffle((V)[i], Mask[i]); \
+        (V)[si] = shuffle((V)[si], Mask[si]); \
     } \
 }
 
@@ -25,10 +25,10 @@
 {\
     uniform Sort8Type _STemp[8]; \
     Copy_Temp_Vector8(_STemp, V); \
-    foreach (i = 0 ... 8) \
+    foreach (si = 0 ... 8) \
     { \
         _Pragma("ignore warning(perf)") \
-        (V)[i] = _STemp[Mask[i]]; \
+        (V)[si] = _STemp[Mask[si]]; \
     } \
 }
 
@@ -38,9 +38,9 @@
 
 #define Shuffle8_One_Vector_To_Vector(Sort8Type, V, SaveV, Mask) \
 { \
-    foreach (i = 0 ... 8) \
+    foreach (si = 0 ... 8) \
     { \
-        (SaveV)[i] = shuffle((V)[i], Mask[i]); \
+        (SaveV)[si] = shuffle((V)[si], Mask[si]); \
     } \
 }
 
@@ -50,10 +50,10 @@
 { \
     uniform Sort8Type _STemp[8]; \
     Copy_Temp_Vector8(_STemp, V); \
-    foreach (i = 0 ... 8) \
+    foreach (si = 0 ... 8) \
     { \
         _Pragma("ignore warning(perf)") \
-        (SaveV)[i] = _STemp[Mask[i]]; \
+        (SaveV)[si] = _STemp[Mask[si]]; \
     } \
 }
 
@@ -63,9 +63,9 @@
 
 #define Shuffle8_Two_Vectors(Sort8Type, V1, V2, SaveV, Mask) \
 { \
-    foreach (i = 0 ... 8) \
+    foreach (si = 0 ... 8) \
     { \
-        (SaveV)[i] = shuffle((V1)[i], (V2)[i], Mask[i]); \
+        (SaveV)[si] = shuffle((V1)[si], (V2)[si], Mask[si]); \
     } \
 }
 
@@ -74,16 +74,16 @@
 #define Shuffle8_Two_Vectors(Sort8Type, V1, V2, SaveV, Mask) \
 { \
     uniform Sort8Type _STemp[8 + 8]; \
-    foreach (i = 0 ... 8) \
+    foreach (si = 0 ... 8) \
     { \
-        _STemp[i] = (V1)[i]; \
-        _STemp[i + 8] = (V2)[i]; \
+        _STemp[si] = (V1)[si]; \
+        _STemp[si + 8] = (V2)[si]; \
     } \
 \
-    foreach (i = 0 ... 8) \
+    foreach (si = 0 ... 8) \
     { \
         _Pragma("ignore warning(perf)") \
-        (SaveV)[i] = _STemp[Mask[i]]; \
+        (SaveV)[si] = _STemp[Mask[si]]; \
     } \
 }
 

@@ -3,9 +3,9 @@
 
 #define Copy_Temp_Vector4(Temp, V) \
 { \
-    foreach (i = 0 ... 4) \
+    foreach (si = 0 ... 4) \
     { \
-        (Temp)[i] = (V)[i]; \
+        (Temp)[si] = (V)[si]; \
     } \
 }
 
@@ -13,9 +13,9 @@
 
 #define Shuffle4_One_Vector(Sort4Type, V, Mask) \
 {\
-    foreach (i = 0 ... 4) \
+    foreach (si = 0 ... 4) \
     { \
-        (V)[i] = shuffle((V)[i], Mask[i]); \
+        (V)[si] = shuffle((V)[si], Mask[si]); \
     } \
 }
 
@@ -25,10 +25,10 @@
 {\
     uniform Sort4Type _STemp[4]; \
     Copy_Temp_Vector4(_STemp, V); \
-    foreach (i = 0 ... 4) \
+    foreach (si = 0 ... 4) \
     { \
         _Pragma("ignore warning(perf)") \
-        (V)[i] = _STemp[Mask[i]]; \
+        (V)[si] = _STemp[Mask[si]]; \
     } \
 }
 
@@ -38,9 +38,9 @@
 
 #define Shuffle4_One_Vector_To_Vector(Sort4Type, V, SaveV, Mask) \
 { \
-    foreach (i = 0 ... 4) \
+    foreach (si = 0 ... 4) \
     { \
-        (SaveV)[i] = shuffle((V)[i], Mask[i]); \
+        (SaveV)[si] = shuffle((V)[si], Mask[si]); \
     } \
 }
 
@@ -50,10 +50,10 @@
 { \
     uniform Sort4Type _STemp[4]; \
     Copy_Temp_Vector4(_STemp, V); \
-    foreach (i = 0 ... 4) \
+    foreach (si = 0 ... 4) \
     { \
         _Pragma("ignore warning(perf)") \
-        (SaveV)[i] = _STemp[Mask[i]]; \
+        (SaveV)[si] = _STemp[Mask[si]]; \
     } \
 }
 
@@ -63,9 +63,9 @@
 
 #define Shuffle4_Two_Vectors(Sort4Type, V1, V2, SaveV, Mask) \
 { \
-    foreach (i = 0 ... 4) \
+    foreach (si = 0 ... 4) \
     { \
-        (SaveV)[i] = shuffle((V1)[i], (V2)[i], Mask[i]); \
+        (SaveV)[si] = shuffle((V1)[si], (V2)[si], Mask[si]); \
     } \
 }
 
@@ -74,16 +74,16 @@
 #define Shuffle4_Two_Vectors(Sort4Type, V1, V2, SaveV, Mask) \
 { \
     uniform Sort4Type _STemp[4 + 4]; \
-    foreach (i = 0 ... 4) \
+    foreach (si = 0 ... 4) \
     { \
-        _STemp[i] = (V1)[i]; \
-        _STemp[i + 4] = (V2)[i]; \
+        _STemp[si] = (V1)[si]; \
+        _STemp[si + 4] = (V2)[si]; \
     } \
 \
-    foreach (i = 0 ... 4) \
+    foreach (si = 0 ... 4) \
     { \
         _Pragma("ignore warning(perf)") \
-        (SaveV)[i] = _STemp[Mask[i]]; \
+        (SaveV)[si] = _STemp[Mask[si]]; \
     } \
 }
 
@@ -100,23 +100,23 @@
 
 #define COEX_4_ASC(V1, V2, Sort4Type, ...) \
 { \
-    foreach (i = 0 ... 4) \
+    foreach (si = 0 ... 4) \
     { \
-        Sort4Type TempV = (V1)[i]; \
+        Sort4Type TempV = (V1)[si]; \
 \
-        (V1)[i] = min(TempV, (V2)[i]); \
-        (V2)[i] = max(TempV, (V2)[i]); \
+        (V1)[si] = min(TempV, (V2)[si]); \
+        (V2)[si] = max(TempV, (V2)[si]); \
     } \
 }
 
 #define COEX_4_DESC(V1, V2, Sort4Type, ...) \
 { \
-    foreach (i = 0 ... 4) \
+    foreach (si = 0 ... 4) \
     { \
-        Sort4Type TempV = (V1)[i]; \
+        Sort4Type TempV = (V1)[si]; \
 \
-        (V1)[i] = max(TempV, (V2)[i]); \
-        (V2)[i] = min(TempV, (V2)[i]); \
+        (V1)[si] = max(TempV, (V2)[si]); \
+        (V2)[si] = min(TempV, (V2)[si]); \
     } \
 }
 
@@ -136,10 +136,10 @@
 \
     uniform Sort4Type Min[4]; \
     uniform Sort4Type Max[4]; \
-    foreach (i = 0 ... 4) \
+    foreach (si = 0 ... 4) \
     { \
-        Min[i] = min(TempV[i], (V)[i]); \
-        Max[i] = max(TempV[i], (V)[i]); \
+        Min[si] = min(TempV[si], (V)[si]); \
+        Max[si] = max(TempV[si], (V)[si]); \
     } \
 \
     Shuffle4_Two_Vectors(Sort4Type, Min, Max, (V), Mask2); \
@@ -152,10 +152,10 @@
 \
     uniform Sort4Type Min[4]; \
     uniform Sort4Type Max[4]; \
-    foreach (i = 0 ... 4) \
+    foreach (si = 0 ... 4) \
     { \
-        Min[i] = max(TempV[i], (V)[i]); \
-        Max[i] = min(TempV[i], (V)[i]); \
+        Min[si] = max(TempV[si], (V)[si]); \
+        Max[si] = min(TempV[si], (V)[si]); \
     } \
 \
     Shuffle4_Two_Vectors(Sort4Type, Min, Max, (V), Mask2); \

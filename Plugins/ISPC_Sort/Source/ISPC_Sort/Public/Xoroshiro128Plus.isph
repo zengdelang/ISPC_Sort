@@ -1,6 +1,32 @@
 #ifndef __XOROSHIRO128PLUS_ISPH__
 #define __XOROSHIRO128PLUS_ISPH__
 
+/* Numeric constants
+ *****************************************************************************/
+
+#define MIN_uint8		((uint8)	0x00)
+#define	MIN_uint16		((uint16)	0x0000)
+#define	MIN_uint32		((uint32)	0x00000000)
+#define MIN_uint64		((uint64)	0x0000000000000000)
+#define MIN_int8		((int8)		-128)
+#define MIN_int16		((int16)	-32768)
+#define MIN_int32		(0x80000000)
+#define MIN_int64		((int64)	0x8000000000000000)
+
+#define MAX_uint8		((uint8)	0xff)
+#define MAX_uint16		((uint16)	0xffff)
+#define MAX_uint32		((uint32)	0xffffffff)
+#define MAX_uint64		((uint64)	0xffffffffffffffff)
+#define MAX_int8		((int8)		0x7f)
+#define MAX_int16		((int16)	0x7fff)
+#define MAX_int32		(0x7fffffff)
+#define MAX_int64		((int64)	0x7fffffffffffffff)
+
+#define MIN_flt			(1.175494351e-38F)			/* min positive value */
+#define MAX_flt			(3.402823466e+38F)
+#define MIN_dbl			(2.2250738585072014e-308)	/* min positive value */
+#define MAX_dbl			(1.7976931348623158e+308)	
+
 // https://prng.di.unimi.it/
 // https://prng.di.unimi.it/xoroshiro128plus.c
 
@@ -71,13 +97,26 @@
 
 #endif
 
+// inline void RightShift(uniform uint64* V, uniform int32 imm8)
+#ifndef RightShift
+
+#define RightShift(V, imm8, Count)  \
+{ \
+    foreach (i = 0 ... Count) \
+    { \
+        V[i] = V[i] >> imm8; \
+    } \
+}
+
+#endif
+
 /** 
  * average of two integers without overflow
  * http://aggregate.org/MAGIC/#Average%20of%20Integers 
  */
 inline uniform int8 Average(uniform int8 A, uniform int8 B) 
 { 
-    return (A & B) + ((A ^ B) >> 1); 
+    return (A & B) + ((A ^ B) >> 1);
 }
 
 inline uniform int16 Average(uniform int16 A, uniform int16 B) 
@@ -87,32 +126,58 @@ inline uniform int16 Average(uniform int16 A, uniform int16 B)
 
 inline uniform int32 Average(uniform int32 A, uniform int32 B) 
 { 
-    return (A & B) + ((A ^ B) >> 1); 
+    return (A & B) + ((A ^ B) >> 1);
 }
 
 inline uniform int64 Average(uniform int64 A, uniform int64 B) 
 { 
-    return (A & B) + ((A ^ B) >> 1); 
+    return (A & B) + ((A ^ B) >> 1);
 }
 
 inline uniform uint8 Average(uniform uint8 A, uniform uint8 B) 
 { 
-    return (A & B) + ((A ^ B) >> 1); 
+    return (A & B) + ((A ^ B) >> 1);
 }
 
 inline uniform uint16 Average(uniform uint16 A, uniform uint16 B) 
 { 
-    return (A & B) + ((A ^ B) >> 1); 
+    return (A & B) + ((A ^ B) >> 1);
 }
 
 inline uniform uint32 Average(uniform uint32 A, uniform uint32 B) 
 { 
-    return (A & B) + ((A ^ B) >> 1); 
+    return (A & B) + ((A ^ B) >> 1);
 }
 
 inline uniform uint64 Average(uniform uint64 A, uniform uint64 B) 
 { 
-    return (A & B) + ((A ^ B) >> 1); 
+    return (A & B) + ((A ^ B) >> 1);
 }
+
+inline uniform float Average(uniform float A, uniform float B) 
+{ 
+    return (A + B) * 0.5;
+}
+
+inline uniform double Average(uniform double A, uniform double B) 
+{ 
+    return (A + B) * 0.5;
+}
+
+// static uint64 SplitMix64(uint64 z) 
+// {
+//     z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+//     z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+//     return z ^ (z >> 31);
+// }
+
+// static void GenerateSeeds(uniform uint64 seeds[], uniform int32 Count) 
+// {
+//     seeds[0] = SplitMix64(0x9E3779B97F4A7C15ull);
+//     for (uniform int32 i = 1; i < Count; ++i) 
+//     {
+//         seeds[i] = SplitMix64(seeds[i - 1]);
+//     }
+// }
 
 #endif

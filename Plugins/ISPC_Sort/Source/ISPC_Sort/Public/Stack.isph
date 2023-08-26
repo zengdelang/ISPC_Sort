@@ -1,0 +1,48 @@
+#ifndef __INT_STACK_ISPH__
+#define __INT_STACK_ISPH__
+
+#define STACK_INIT_SIZE 8
+
+inline uniform bool StackIsEmpty(uniform uint32 Top)
+{
+    return Top == -1;
+}
+
+#define PushValue(ValueType, Top, Base, StackMemoty, HeapMemory, StackSize, Elem) \
+{ \
+    if (Top + 1 >= StackSize) \
+    { \
+        uniform uint32 NewStackSize = StackSize * 2; \
+        uniform ValueType* uniform NewHeapMemory = uniform new ValueType[NewStackSize]; \
+\
+        if (HeapMemory != NULL) \
+        { \
+            memcpy(NewHeapMemory, HeapMemory, StackSize * sizeof(uniform ValueType)); \
+\
+            if (HeapMemory != NULL) \
+            { \
+                delete[] HeapMemory; \
+                HeapMemory = NULL; \
+            } \
+        } \
+        else \
+        { \
+            memcpy(NewHeapMemory, &StackMemoty[0], StackSize * sizeof(uniform ValueType)); \
+        } \
+\
+        HeapMemory = NewHeapMemory; \
+        Base = HeapMemory; \
+        StackSize = NewStackSize; \
+    } \
+\
+    ++Top; \
+    Base[Top] = Elem; \
+}
+
+#define PopValue(ValueType, Top, Base, Elem) \
+{ \
+    Elem = Base[Top]; \
+    --Top; \
+}
+
+#endif
