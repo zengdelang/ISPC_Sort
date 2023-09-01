@@ -1,0 +1,662 @@
+#include "PrimitiveTypes/BitonicSort8.isph"
+
+#if TARGET_WIDTH == 8
+
+inline void COEX_##ID##(##COEX_Func_Params##)
+{
+    // TODO
+    /*
+    uniform bool SelectMask[8] = {false, true, false, true, false, true, false, true};
+    foreach (i = 0 ... 8)
+    {
+        SelectMask[i] = Data1_V1[i] < Data1_V2[i];
+        SelectMask[i] |= (Data1_V1[i] == Data1_V2[i]) & Data2_V1[i] < Data2_V2[i];
+        SelectMask[i] |= (Data1_V1[i] == Data1_V2[i]) & (Data2_V1[i] == Data2_V2[i]) & Data3_V1[i] < Data3_V2[i];
+    }
+
+    foreach (i = 0 ... 8)
+    {
+        int32 Data1_Temp = Data1_V1[i];
+        Data1_Min[i] = select(SelectMask[i], Data1_Temp, Data1_V2[i]);
+        Data1_Max[i] = select(SelectMask[i], Data1_V2[i], Data1_Temp);
+
+        int32 Data2_Temp = Data2_V1[i];
+        Data2_Min[i] = select(SelectMask[i], Data2_Temp, Data2_V2[i]);
+        Data2_Max[i] = select(SelectMask[i], Data2_V2[i], Data2_Temp);
+
+        int32 Data3_Temp = Data3_V1[i];
+        Data3_Min[i] = select(SelectMask[i], Data3_Temp, Data3_V2[i]);
+        Data3_Max[i] = select(SelectMask[i], Data3_V2[i], Data3_Temp);
+    }*/
+}
+
+inline void COEX_##ID##(##COEX1_Func_Params##)
+{
+    COEX_##ID##(##COEX1_Params##);
+}
+
+inline void COEX_Sequence_##ID##(##COEX_Sequence_Func_Params##)
+{
+    COEX_##ID##(##COEX1_Params##);
+}
+
+inline void COEX_PERMUTE_##ID##(##COEX_PERMUTE_Params##, const uniform int Mask[])
+{
+##COEX_PERMUTE_Step1##
+    COEX_##ID##(##COEX_PERMUTE_Step2##);
+}
+
+inline void COEX_SHUFFLE_##ID##(##COEX_SHUFFLE_Func_Params##, const uniform int Mask1[], const uniform int Mask2[])
+{
+##COEX_SHUFFLE_Step1##
+##COEX_SHUFFLE_Step2##
+
+    COEX_##ID##(##COEX_SHUFFLE_Step3##);
+
+##COEX_SHUFFLE_Step4##
+}
+
+inline void Bitonic_Sort_16_##ID##(##Bitonic_Sort_Params##)
+{
+##LoadDataCode##
+    
+    // step1
+    COEX_##ID##(##COEX_Params##);
+
+    // step 2
+    {
+        const uniform int Mask[8] = {1, 0, 3, 2, 5, 4, 7, 6};
+
+##Shuffle_One_Vector##
+
+        COEX_##ID##(##COEX_Params##); 
+    }
+
+    // step 3
+    {
+##Copy_Temp_Vector_V1##
+
+        const uniform int Mask1[8] = {0, 2, 0 + 8, 2 + 8, 4, 6, 4 + 8, 6 + 8};
+##Shuffle_Two_Vectors1##
+
+        const uniform int Mask2[8] = {1, 3, 1 + 8, 3 + 8, 5, 7, 5 + 8, 7 + 8};
+##Shuffle_Two_Vectors2##
+
+        COEX_##ID##(##COEX_Params##);
+    }
+
+    // step 4
+    {
+        const uniform int Mask[8] = {3, 2, 1, 0, 7, 6, 5, 4};
+##Shuffle_One_Vector##
+
+        COEX_##ID##(##COEX_Params##);
+    }
+
+    // step 5
+    {
+##Copy_Temp_Vector_V1##
+
+        const uniform int Mask1[8] = {0, 1, 0 + 8, 1 + 8,  4, 5,   4 + 8, 5 + 8};
+##Shuffle_Two_Vectors1##
+        
+        const uniform int Mask2[8] = {2, 3, 2 + 8, 3 + 8,  6, 7,   6 + 8, 7 + 8};
+##Shuffle_Two_Vectors2##
+
+        COEX_##ID##(##COEX_Params##);
+    }
+
+    // step 6
+    {
+##Copy_Temp_Vector_V1##
+
+        const uniform int Mask1[8] = {0, 2, 1 + 8, 3 + 8,  4, 6,  5 + 8,  7 + 8};
+##Shuffle_Two_Vectors1##
+               
+        const uniform int Mask2[8] = {1, 3, 0 + 8, 2 + 8,  5, 7,  4 + 8,  6 +8};
+##Shuffle_Two_Vectors2##
+
+        COEX_##ID##(##COEX_Params##);
+    }
+
+    // step 7
+    {
+        const uniform int Mask[8] = {7, 6, 5, 4, 3, 2, 1, 0};
+##Shuffle_One_Vector##
+
+        COEX_##ID##(##COEX_Params##);
+    }
+
+    // step 8
+    {
+##Copy_Temp_Vector_V1##
+
+        const uniform int Mask1[8] = {0, 2, 1 + 8, 3 + 8, 4,  6, 1 + 4 + 8, 3 + 4 + 8};
+##Shuffle_Two_Vectors1##
+            
+        const uniform int Mask2[8] = {1, 3, 0 + 8, 2 + 8, 1 + 4, 3 + 4, 0 + 4 + 8, 2 + 4 +8};
+##Shuffle_Two_Vectors2##
+
+        COEX_##ID##(##COEX_Params##);  
+    }
+
+    // step 9
+    {
+##Copy_Temp_Vector_V1##
+
+        const uniform int Mask1[8] = {0, 2, 1 + 8, 3 + 8, 0 + 4, 2 + 4, 1 + 4 + 8, 3 + 4 + 8};
+##Shuffle_Two_Vectors1##
+            
+        const uniform int Mask2[8] = {1, 3, 0 + 8, 2 + 8, 1 + 4, 3 + 4, 0 + 4 + 8, 2 + 4 +8};
+##Shuffle_Two_Vectors2##
+        
+        COEX_##ID##(##COEX_Params##);
+    }
+
+    // step 10
+    {
+##Copy_Temp_Vector_V1##
+
+        const uniform int Mask1[8] = {0,    1,     0 + 8,     1 + 8,       2,    3,      2 + 8,    3 + 8};
+##Shuffle_Two_Vectors3##
+
+        const uniform int Mask2[8] = {4,    5,     4 + 8,     5 + 8,       6,    7,      6 + 8,    7 + 8};
+##Shuffle_Two_Vectors2##
+
+        COEX_##ID##(##COEX_Params##);
+    }
+
+    // restore order
+    {
+        const uniform int Mask1[8] = {0, 0 + 8,   2, 2 + 8,    4, 4 + 8,   6, 6 + 8};
+##Shuffle_Two_Vectors4##
+
+        const uniform int Mask2[8] = {1, 1 + 8,   3, 3 + 8,    5, 5 + 8,   7, 7 + 8};
+##Shuffle_Two_Vectors5##
+    }
+}
+
+inline void Merge_8_Columns_With_16_Elements_##ID##(##Sort_16_Column_Wise_Params##)
+{
+    const uniform int Mask[8] = {1, 0, 3, 2, 5, 4, 7, 6};
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_0##, ##Merge_8_Columns_With_16_Elements_Step1_1##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_2##, ##Merge_8_Columns_With_16_Elements_Step1_3##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_4##, ##Merge_8_Columns_With_16_Elements_Step1_5##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_6##, ##Merge_8_Columns_With_16_Elements_Step1_7##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_8##, ##Merge_8_Columns_With_16_Elements_Step1_9##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_10##, ##Merge_8_Columns_With_16_Elements_Step1_11##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_12##, ##Merge_8_Columns_With_16_Elements_Step1_13##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_14##, ##Merge_8_Columns_With_16_Elements_Step1_15##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_16##, ##Merge_8_Columns_With_16_Elements_Step1_17##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_18##, ##Merge_8_Columns_With_16_Elements_Step1_19##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_20##, ##Merge_8_Columns_With_16_Elements_Step1_21##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_22##, ##Merge_8_Columns_With_16_Elements_Step1_23##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_24##, ##Merge_8_Columns_With_16_Elements_Step1_25##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_26##, ##Merge_8_Columns_With_16_Elements_Step1_27##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_28##, ##Merge_8_Columns_With_16_Elements_Step1_29##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_30##, ##Merge_8_Columns_With_16_Elements_Step1_31##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_32##, ##Merge_8_Columns_With_16_Elements_Step1_33##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_34##, ##Merge_8_Columns_With_16_Elements_Step1_35##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_36##, ##Merge_8_Columns_With_16_Elements_Step1_37##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_38##, ##Merge_8_Columns_With_16_Elements_Step1_39##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_40##, ##Merge_8_Columns_With_16_Elements_Step1_41##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_42##, ##Merge_8_Columns_With_16_Elements_Step1_43##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_44##, ##Merge_8_Columns_With_16_Elements_Step1_45##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_46##, ##Merge_8_Columns_With_16_Elements_Step1_47##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_48##, ##Merge_8_Columns_With_16_Elements_Step1_49##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_50##, ##Merge_8_Columns_With_16_Elements_Step1_51##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_52##, ##Merge_8_Columns_With_16_Elements_Step1_53##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_54##, ##Merge_8_Columns_With_16_Elements_Step1_55##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_56##, ##Merge_8_Columns_With_16_Elements_Step1_57##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_58##, ##Merge_8_Columns_With_16_Elements_Step1_59##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_60##, ##Merge_8_Columns_With_16_Elements_Step1_61##, Mask);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step1_62##, ##Merge_8_Columns_With_16_Elements_Step1_63##, Mask);
+
+    const uniform int Mask1[8] = {0, 1 + 8, 2, 3 + 8, 4, 5 + 8, 6, 7 + 8};
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step2_0##, Mask, Mask1); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step2_1##, Mask, Mask1);
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step2_2##, Mask, Mask1); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step2_3##, Mask, Mask1);
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step2_4##, Mask, Mask1); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step2_5##, Mask, Mask1);
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step2_6##, Mask, Mask1); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step2_7##, Mask, Mask1);
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step2_8##, Mask, Mask1); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step2_9##, Mask, Mask1);
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step2_10##, Mask, Mask1); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step2_11##, Mask, Mask1);
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step2_12##, Mask, Mask1); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step2_13##, Mask, Mask1);
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step2_14##, Mask, Mask1); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step2_15##, Mask, Mask1);
+
+    const uniform int Mask2[8] = {3, 2, 1, 0, 7, 6, 5, 4};
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_0##, ##Merge_8_Columns_With_16_Elements_Step3_1##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_2##, ##Merge_8_Columns_With_16_Elements_Step3_3##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_4##, ##Merge_8_Columns_With_16_Elements_Step3_5##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_6##, ##Merge_8_Columns_With_16_Elements_Step3_7##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_8##, ##Merge_8_Columns_With_16_Elements_Step3_9##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_10##, ##Merge_8_Columns_With_16_Elements_Step3_11##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_12##, ##Merge_8_Columns_With_16_Elements_Step3_13##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_14##, ##Merge_8_Columns_With_16_Elements_Step3_15##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_16##, ##Merge_8_Columns_With_16_Elements_Step3_17##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_18##, ##Merge_8_Columns_With_16_Elements_Step3_19##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_20##, ##Merge_8_Columns_With_16_Elements_Step3_21##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_22##, ##Merge_8_Columns_With_16_Elements_Step3_23##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_24##, ##Merge_8_Columns_With_16_Elements_Step3_25##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_26##, ##Merge_8_Columns_With_16_Elements_Step3_27##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_28##, ##Merge_8_Columns_With_16_Elements_Step3_29##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_30##, ##Merge_8_Columns_With_16_Elements_Step3_31##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_32##, ##Merge_8_Columns_With_16_Elements_Step3_33##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_34##, ##Merge_8_Columns_With_16_Elements_Step3_35##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_36##, ##Merge_8_Columns_With_16_Elements_Step3_37##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_38##, ##Merge_8_Columns_With_16_Elements_Step3_39##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_40##, ##Merge_8_Columns_With_16_Elements_Step3_41##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_42##, ##Merge_8_Columns_With_16_Elements_Step3_43##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_44##, ##Merge_8_Columns_With_16_Elements_Step3_45##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_46##, ##Merge_8_Columns_With_16_Elements_Step3_47##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_48##, ##Merge_8_Columns_With_16_Elements_Step3_49##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_50##, ##Merge_8_Columns_With_16_Elements_Step3_51##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_52##, ##Merge_8_Columns_With_16_Elements_Step3_53##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_54##, ##Merge_8_Columns_With_16_Elements_Step3_55##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_56##, ##Merge_8_Columns_With_16_Elements_Step3_57##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_58##, ##Merge_8_Columns_With_16_Elements_Step3_59##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_60##, ##Merge_8_Columns_With_16_Elements_Step3_61##, Mask2);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step3_62##, ##Merge_8_Columns_With_16_Elements_Step3_63##, Mask2);
+
+    const uniform int Mask3[8] = {0, 1, 2 + 8, 3 + 8, 4, 5, 6 + 8, 7 + 8};
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_0##, Mask2, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_0##, Mask, Mask1);
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_1##, Mask2, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_1##, Mask, Mask1);
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_2##, Mask2, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_2##, Mask, Mask1);
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_3##, Mask2, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_3##, Mask, Mask1);
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_4##, Mask2, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_4##, Mask, Mask1);
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_5##, Mask2, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_5##, Mask, Mask1);
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_6##, Mask2, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_6##, Mask, Mask1);
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_7##, Mask2, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_7##, Mask, Mask1);
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_8##, Mask2, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_8##, Mask, Mask1);
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_9##, Mask2, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_9##, Mask, Mask1);
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_10##, Mask2, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_10##, Mask, Mask1);
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_11##, Mask2, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_11##, Mask, Mask1);
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_12##, Mask2, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_12##, Mask, Mask1);
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_13##, Mask2, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_13##, Mask, Mask1);
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_14##, Mask2, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_14##, Mask, Mask1);
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_15##, Mask2, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step4_15##, Mask, Mask1);
+
+    const uniform int Mask4[8] = {7, 6, 5, 4, 3, 2, 1, 0};
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_0##, ##Merge_8_Columns_With_16_Elements_Step5_1##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_2##, ##Merge_8_Columns_With_16_Elements_Step5_3##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_4##, ##Merge_8_Columns_With_16_Elements_Step5_5##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_6##, ##Merge_8_Columns_With_16_Elements_Step5_7##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_8##, ##Merge_8_Columns_With_16_Elements_Step5_9##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_10##, ##Merge_8_Columns_With_16_Elements_Step5_11##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_12##, ##Merge_8_Columns_With_16_Elements_Step5_13##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_14##, ##Merge_8_Columns_With_16_Elements_Step5_15##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_16##, ##Merge_8_Columns_With_16_Elements_Step5_17##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_18##, ##Merge_8_Columns_With_16_Elements_Step5_19##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_20##, ##Merge_8_Columns_With_16_Elements_Step5_21##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_22##, ##Merge_8_Columns_With_16_Elements_Step5_23##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_24##, ##Merge_8_Columns_With_16_Elements_Step5_25##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_26##, ##Merge_8_Columns_With_16_Elements_Step5_27##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_28##, ##Merge_8_Columns_With_16_Elements_Step5_29##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_30##, ##Merge_8_Columns_With_16_Elements_Step5_31##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_32##, ##Merge_8_Columns_With_16_Elements_Step5_33##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_34##, ##Merge_8_Columns_With_16_Elements_Step5_35##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_36##, ##Merge_8_Columns_With_16_Elements_Step5_37##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_38##, ##Merge_8_Columns_With_16_Elements_Step5_39##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_40##, ##Merge_8_Columns_With_16_Elements_Step5_41##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_42##, ##Merge_8_Columns_With_16_Elements_Step5_43##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_44##, ##Merge_8_Columns_With_16_Elements_Step5_45##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_46##, ##Merge_8_Columns_With_16_Elements_Step5_47##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_48##, ##Merge_8_Columns_With_16_Elements_Step5_49##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_50##, ##Merge_8_Columns_With_16_Elements_Step5_51##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_52##, ##Merge_8_Columns_With_16_Elements_Step5_53##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_54##, ##Merge_8_Columns_With_16_Elements_Step5_55##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_56##, ##Merge_8_Columns_With_16_Elements_Step5_57##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_58##, ##Merge_8_Columns_With_16_Elements_Step5_59##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_60##, ##Merge_8_Columns_With_16_Elements_Step5_61##, Mask4);
+    COEX_PERMUTE_##ID##(##Merge_8_Columns_With_16_Elements_Step5_62##, ##Merge_8_Columns_With_16_Elements_Step5_63##, Mask4);
+
+    const uniform int Mask5[8] = {0, 1, 2, 3, 4 + 8, 5 + 8, 6 + 8, 7 + 8};
+    const uniform int Mask2_[8] = {2, 3, 0, 1, 6, 7, 4, 5};
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_0##, Mask4, Mask5); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_0##, Mask2_, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_0##, Mask, Mask1); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_1##, Mask4, Mask5); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_1##, Mask2_, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_1##, Mask, Mask1); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_2##, Mask4, Mask5); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_2##, Mask2_, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_2##, Mask, Mask1); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_3##, Mask4, Mask5); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_3##, Mask2_, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_3##, Mask, Mask1); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_4##, Mask4, Mask5); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_4##, Mask2_, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_4##, Mask, Mask1); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_5##, Mask4, Mask5); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_5##, Mask2_, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_5##, Mask, Mask1); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_6##, Mask4, Mask5); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_6##, Mask2_, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_6##, Mask, Mask1); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_7##, Mask4, Mask5); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_7##, Mask2_, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_7##, Mask, Mask1); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_8##, Mask4, Mask5); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_8##, Mask2_, Mask3);
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_8##, Mask, Mask1); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_9##, Mask4, Mask5); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_9##, Mask2_, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_9##, Mask, Mask1); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_10##, Mask4, Mask5); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_10##, Mask2_, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_10##, Mask, Mask1); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_11##, Mask4, Mask5); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_11##, Mask2_, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_11##, Mask, Mask1); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_12##, Mask4, Mask5); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_12##, Mask2_, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_12##, Mask, Mask1); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_13##, Mask4, Mask5); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_13##, Mask2_, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_13##, Mask, Mask1); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_14##, Mask4, Mask5); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_14##, Mask2_, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_14##, Mask, Mask1); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_15##, Mask4, Mask5); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_15##, Mask2_, Mask3); 
+    COEX_SHUFFLE_##ID##(##Merge_8_Columns_With_16_Elements_Step6_15##, Mask, Mask1); 
+}
+
+// The size of Data must be 128
+inline void Sort_16_Column_Wise_##ID##(##Sort_16_Column_Wise_Params##)
+{
+    // Green’s irregular sorting network
+
+    /* step 1 */
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step1_0##, ##Sort_16_Column_Wise_Step1_1##); COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step1_2##, ##Sort_16_Column_Wise_Step1_3##);
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step1_4##, ##Sort_16_Column_Wise_Step1_5##); COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step1_6##, ##Sort_16_Column_Wise_Step1_7##);
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step1_8##, ##Sort_16_Column_Wise_Step1_9##); COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step1_10##, ##Sort_16_Column_Wise_Step1_11##);
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step1_12##, ##Sort_16_Column_Wise_Step1_13##); COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step1_14##, ##Sort_16_Column_Wise_Step1_15##);
+
+    /* step 2 */
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step2_0##, ##Sort_16_Column_Wise_Step2_1##); COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step2_2##, ##Sort_16_Column_Wise_Step2_3##);
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step2_4##, ##Sort_16_Column_Wise_Step2_5##); COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step2_6##, ##Sort_16_Column_Wise_Step2_7##);
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step2_8##, ##Sort_16_Column_Wise_Step2_9##); COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step2_10##, ##Sort_16_Column_Wise_Step2_11##);
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step2_12##, ##Sort_16_Column_Wise_Step2_13##); COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step2_14##, ##Sort_16_Column_Wise_Step2_15##);
+
+    /* step 3 */
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step3_0##, ##Sort_16_Column_Wise_Step3_1##); COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step3_2##, ##Sort_16_Column_Wise_Step3_3##);
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step3_4##, ##Sort_16_Column_Wise_Step3_5##); COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step3_6##, ##Sort_16_Column_Wise_Step3_7##);
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step3_8##, ##Sort_16_Column_Wise_Step3_9##); COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step3_10##, ##Sort_16_Column_Wise_Step3_11##);
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step3_12##, ##Sort_16_Column_Wise_Step3_13##); COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step3_14##, ##Sort_16_Column_Wise_Step3_15##);
+
+    /* step 4 */
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step4_0##, ##Sort_16_Column_Wise_Step4_1##); COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step4_2##, ##Sort_16_Column_Wise_Step4_3##);
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step4_4##, ##Sort_16_Column_Wise_Step4_5##); COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step4_6##, ##Sort_16_Column_Wise_Step4_7##);
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step4_8##, ##Sort_16_Column_Wise_Step4_9##); COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step4_10##, ##Sort_16_Column_Wise_Step4_11##);
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step4_12##, ##Sort_16_Column_Wise_Step4_13##); COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step4_14##, ##Sort_16_Column_Wise_Step4_15##);
+
+    /* step 5 */
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step5_0##, ##Sort_16_Column_Wise_Step5_1##); COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step5_2##, ##Sort_16_Column_Wise_Step5_3##);
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step5_4##, ##Sort_16_Column_Wise_Step5_5##); COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step5_6##, ##Sort_16_Column_Wise_Step5_7##);
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step5_8##, ##Sort_16_Column_Wise_Step5_9##); COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step5_10##, ##Sort_16_Column_Wise_Step5_11##);
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step5_12##, ##Sort_16_Column_Wise_Step5_13##);
+
+    /* step 6 */
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step6_0##, ##Sort_16_Column_Wise_Step6_1##); COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step6_2##, ##Sort_16_Column_Wise_Step6_3##);
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step6_4##, ##Sort_16_Column_Wise_Step6_5##); COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step6_6##, ##Sort_16_Column_Wise_Step6_7##);
+
+    /* step 7 */
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step7_0##, ##Sort_16_Column_Wise_Step7_1##); COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step7_2##, ##Sort_16_Column_Wise_Step7_3##);
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step7_4##, ##Sort_16_Column_Wise_Step7_5##); COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step7_6##, ##Sort_16_Column_Wise_Step7_7##);
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step7_8##, ##Sort_16_Column_Wise_Step7_9##); COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step7_10##, ##Sort_16_Column_Wise_Step7_11##);
+
+    /* step 8 */
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step8_0##, ##Sort_16_Column_Wise_Step8_1##); COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step8_2##, ##Sort_16_Column_Wise_Step8_3##);
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step8_4##, ##Sort_16_Column_Wise_Step8_5##); COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step8_6##, ##Sort_16_Column_Wise_Step8_7##);
+
+    /* step 9 */
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step9_0##, ##Sort_16_Column_Wise_Step9_1##); COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step9_2##, ##Sort_16_Column_Wise_Step9_3##);
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step9_4##, ##Sort_16_Column_Wise_Step9_5##); COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step9_6##, ##Sort_16_Column_Wise_Step9_7##);
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step9_8##, ##Sort_16_Column_Wise_Step9_9##);
+
+    /* step 10 */
+    COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step10_0##, ##Sort_16_Column_Wise_Step10_1##); COEX_Sequence_##ID##(##Sort_16_Column_Wise_Step10_2##, ##Sort_16_Column_Wise_Step10_3##);
+}
+
+inline void Bitonic_Merge_16_##ID##(##Merge_Params##, const uniform int N, const uniform int S = 2)
+{
+    for (uniform int T = S * 2; T < 2 * N; T *= 2)
+	{
+		for (uniform int L = 0; L < N; L += T)
+		{
+			for (uniform int J = max(L + T - N, 0); J < T / 2; J += 2)
+			{
+                // reverse vector
+                const uniform int Mask[8] = {7, 6, 5, 4, 3, 2, 1, 0};
+##Bitonic_Merge_Step0##
+
+				COEX_Sequence_##ID##(##Bitonic_Merge_Step1##);
+				COEX_Sequence_##ID##(##Bitonic_Merge_Step2##);
+			}
+		}
+		
+		for (uniform int M = T / 2; M > 4; M /= 2)
+		{
+			for (uniform int k = 0; k < N - M / 2; k += M)
+			{
+				const uniform int Bound = min((k + M / 2), N - (M / 2));
+				for (uniform int J = k; J < Bound; J += 2)
+				{
+					COEX_Sequence_##ID##(##Bitonic_Merge_Step3##);
+					COEX_Sequence_##ID##(##Bitonic_Merge_Step4##);
+				}
+			}
+		}
+		
+		for (uniform int J = 0; J < N - 2; J += 4)
+		{
+			COEX_Sequence_##ID##(##Bitonic_Merge_Step5##);
+			COEX_Sequence_##ID##(##Bitonic_Merge_Step6##);
+		}
+		
+		for (uniform int J = 0; J < N; J += 2)
+		{
+			COEX_Sequence_##ID##(##Bitonic_Merge_Step7##);
+		}
+		
+		for (uniform int I = 0; I < N; I += 2)
+		{
+            const uniform int Mask[8] = {4, 5, 6, 7, 0, 1, 2, 3};
+            const uniform int Mask1[8] = {0, 1, 2, 3, 4 + 8, 5 + 8, 6 + 8, 7 + 8};
+
+            COEX_SHUFFLE_##ID##(##Bitonic_Merge_LastStep_1##, Mask, Mask1); 
+            COEX_SHUFFLE_##ID##(##Bitonic_Merge_LastStep_2##, Mask, Mask1); 
+
+            const uniform int Mask2[8] = {0, 0 + 8, 1, 1 + 8,  4, 4 + 8, 5, 5 + 8};
+            const uniform int Mask3[8] = {2, 2 + 8, 3, 3 + 8,  6, 6 + 8, 7, 7 + 8};
+
+##Bitonic_Merge_LastStep_Temp##
+##Bitonic_Merge_LastStep_Copy_Temp##
+##Bitonic_Merge_LastStep_Shuffle_Two##
+
+            COEX_Sequence_##ID##(##Bitonic_Merge_LastStep_3##);
+
+##Bitonic_Merge_LastStep_Copy_Temp##
+##Bitonic_Merge_LastStep_Shuffle_Two##
+
+            COEX_Sequence_##ID##(##Bitonic_Merge_LastStep_3##);
+
+##Bitonic_Merge_LastStep_Copy_Temp##
+##Bitonic_Merge_LastStep_Shuffle_Two##
+		}
+	}
+}
+
+inline void Bitonic_Merge_128_##ID##(##Merge_Params##, const uniform int N, const uniform int S = 16)
+{
+	uniform int Remainder16 = N - N % 16;
+	uniform int Remainder8 = N - N % 8;
+
+	for (uniform int T = S * 2; T < 2 * N; T *= 2)
+	{
+		for (uniform int L = 0; L < N; L += T)
+		{
+			for (uniform int J = max(L + T - N, 0); J < T / 2; J += 2)
+			{
+                // reverse vector
+                const uniform int Mask[8] = {7, 6, 5, 4, 3, 2, 1, 0};
+##Bitonic_Merge_Step0##
+
+				COEX_Sequence_##ID##(##Bitonic_Merge_Step1##);
+				COEX_Sequence_##ID##(##Bitonic_Merge_Step2##);
+			}
+		}
+
+		for (uniform int M = T / 2; M > 16; M /= 2)
+		{
+			for (uniform int K = 0; K < N - M / 2; K += M)
+			{
+				uniform int Bound = min((K + M / 2), N - (M / 2));
+				for (uniform int J = K; J < Bound; J += 2)
+				{
+					COEX_Sequence_##ID##(##Bitonic_Merge_Step3##);
+					COEX_Sequence_##ID##(##Bitonic_Merge_Step4##);
+				}
+			}
+		}
+
+		for (uniform int J = 0; J < Remainder16; J += 16)
+		{
+            COEX_Sequence_##ID##(##Bitonic_Merge_Remainder16_0##);
+			COEX_Sequence_##ID##(##Bitonic_Merge_Remainder16_1##);
+			COEX_Sequence_##ID##(##Bitonic_Merge_Remainder16_2##);
+			COEX_Sequence_##ID##(##Bitonic_Merge_Remainder16_3##);
+			COEX_Sequence_##ID##(##Bitonic_Merge_Remainder16_4##);
+			COEX_Sequence_##ID##(##Bitonic_Merge_Remainder16_5##);
+			COEX_Sequence_##ID##(##Bitonic_Merge_Remainder16_6##);
+			COEX_Sequence_##ID##(##Bitonic_Merge_Remainder16_7##);
+		}
+
+		for (uniform int J = Remainder16 + 8; J < N; J += 1)
+		{
+            COEX_Sequence_##ID##(##Bitonic_Merge_Remainder16_8##);
+		}
+
+		for (uniform int J = 0; J < Remainder8; J += 8)
+		{
+            COEX_Sequence_##ID##(##Bitonic_Merge_Remainder8_0##);
+			COEX_Sequence_##ID##(##Bitonic_Merge_Remainder8_1##);
+			COEX_Sequence_##ID##(##Bitonic_Merge_Remainder8_2##);
+			COEX_Sequence_##ID##(##Bitonic_Merge_Remainder8_3##);
+		}
+
+		for (uniform int J = Remainder8 + 4; J < N; J += 1)
+		{
+            COEX_Sequence_##ID##(##Bitonic_Merge_Remainder8_4##);
+		}
+
+		for (uniform int J = 0; J < N - 2; J += 4)
+		{
+			COEX_Sequence_##ID##(##Bitonic_Merge_Step5##);
+			COEX_Sequence_##ID##(##Bitonic_Merge_Step6##);
+		}
+
+		for (uniform int J = 0; J < N; J += 2)
+		{
+			COEX_Sequence_##ID##(##Bitonic_Merge_Step7##);
+		}
+		
+        for (uniform int I = 0; I < N; I += 2)
+        {
+            const uniform int Mask[8] = {4, 5, 6, 7, 0, 1, 2, 3};
+            const uniform int Mask1[8] = {0, 1, 2, 3, 4 + 8, 5 + 8, 6 + 8, 7 + 8};
+
+            COEX_SHUFFLE_##ID##(##Bitonic_Merge_LastStep_1##, Mask, Mask1); 
+            COEX_SHUFFLE_##ID##(##Bitonic_Merge_LastStep_2##, Mask, Mask1); 
+
+            const uniform int Mask2[8] = {0, 0 + 8, 1, 1 + 8,  4, 4 + 8, 5, 5 + 8};
+            const uniform int Mask3[8] = {2, 2 + 8, 3, 3 + 8,  6, 6 + 8, 7, 7 + 8};
+
+##Bitonic_Merge_LastStep_Temp##
+##Bitonic_Merge_LastStep_Copy_Temp##
+##Bitonic_Merge_LastStep_Shuffle_Two##
+
+            COEX_Sequence_##ID##(##Bitonic_Merge_LastStep_3##);
+
+##Bitonic_Merge_LastStep_Copy_Temp##
+##Bitonic_Merge_LastStep_Shuffle_Two##
+
+            COEX_Sequence_##ID##(##Bitonic_Merge_LastStep_3##);
+
+##Bitonic_Merge_LastStep_Copy_Temp##
+##Bitonic_Merge_LastStep_Shuffle_Two##
+        }
+	}
+}
+
+void Sort8_Sorting_Network_Impl_##ID##(uniform uint32 DataSize, ##Sort8_Sorting_Network_Impl_Params##)
+{
+    if (DataSize < 2)
+    {
+        return;
+    }
+    else if (DataSize == 16)
+    {
+        Bitonic_Sort_16_##ID##(##Bitonic_Sort_16_Invoke_Params##);
+        return;
+    }
+
+    uniform int Remainder = DataSize % 8 ? DataSize % 8 : 8;
+    uniform int Index_Max_Pad = DataSize - Remainder;
+
+    foreach (i = 0 ... DataSize)
+    {
+##SaveBuffer##
+    }
+
+    foreach (i = DataSize ... (Index_Max_Pad + 8 + 8))
+    {
+##SaveBufferMaxValue##
+    }
+
+    uniform int N = ((Index_Max_Pad % 16 == 0 ? 1 : 0) * 8 + Index_Max_Pad + 8) / 8;
+
+    for (uniform int J = 0; J < (N - N % 16); J += 16)
+    {
+        Sort_16_Column_Wise_##ID##(##Sort_16_Column_Wise_Invoke_Params##);
+        Merge_8_Columns_With_16_Elements_##ID##(##Sort_16_Column_Wise_Invoke_Params##);
+    }
+
+    for (uniform int I = N - N % 16; I < N; I += 2)
+    {
+        Bitonic_Sort_16_##ID##(##Bitonic_Sort_16_Rest_Invoke_Params##);
+    }
+
+    Bitonic_Merge_16_##ID##(##Bitonic_Merge_16_Invoke_Params##, N % 16, 2);
+    Bitonic_Merge_128_##ID##(##Bitonic_Merge_128_Invoke_Params##, N, 16);
+
+    foreach (i = 0 ... DataSize)
+    {
+##SaveData##
+    }
+}
+
+#endif
